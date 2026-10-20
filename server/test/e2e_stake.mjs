@@ -14,7 +14,7 @@ const abi = parseAbi(["function mint(address,uint256)", "function setApprovalFor
 const pub = createPublicClient({ chain: foundry, transport: http(RPC) });
 const wallet = k => createWalletClient({ account: privateKeyToAccount(KEYS[k]), chain: foundry, transport: http(RPC) });
 const tx = async (k, address, functionName, args) => pub.waitForTransactionReceipt({ hash: await wallet(k).writeContract({ address, abi, functionName, args }) });
-const bindMessage = (code, matchId, seat, address) => `Monadverse Bonk Arena\nroom ${code}\nmatch ${matchId}\nseat ${seat}\nwallet ${address.toLowerCase()}`;
+const bindMessage = (code, matchId, seat, address) => `Monorb Bonk Arena\nroom ${code}\nmatch ${matchId}\nseat ${seat}\nwallet ${address.toLowerCase()}`;
 const join = (code, name) => new Promise(ok => { const ws = new WebSocket(BASE.replace("http", "ws") + "/room/" + code), c = { ws, msgs: [], errs: [] };
   ws.onmessage = e => { const m = JSON.parse(e.data); c.msgs.push(m); if (m.t === "s") c.last = m.s; if (m.t === "lobby") c.lobby = m; if (m.t === "err") c.errs.push(m.why); if (m.t === "result") c.result = m; if (m.t === "welcome") { c.id = m.id; ok(c); } };
   ws.onopen = () => ws.send(JSON.stringify({ t: "hello", name, token: 1 })); });
@@ -56,7 +56,7 @@ const ra = await rec(tA), rb = await rec(tB);
 assert.equal(rb.wins, 1); assert.equal(rb.captured, 1); assert.equal(ra.losses, 1); assert.equal(ra.lostInStake, 1);
 console.log(`chronicle: #${tB} ${rb.wins}W captured ${rb.captured} | #${tA} ${ra.losses}L lost in stake ${ra.lostInStake}`);
 // story chapters: only the current holder can write them (Bob now holds both)
-const story = async (k, t, chapter) => { const acc = privateKeyToAccount(KEYS[k]); const message = `Monadverse Chronicle
+const story = async (k, t, chapter) => { const acc = privateKeyToAccount(KEYS[k]); const message = `Monorb Chronicle
 Chog #${t} finished chapter ${chapter}
 wallet ${acc.address.toLowerCase()}`;
   return (await fetch(`${BASE}/chog/${t}/story`, { method: "POST", body: JSON.stringify({ chapter, wallet: acc.address, sig: await acc.signMessage({ message }) }) })).json(); };

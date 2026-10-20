@@ -5,7 +5,7 @@ import { privateKeyToAccount } from "viem/accounts";
 
 const BASE = "http://localhost:8787", KEY = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
 const acc = privateKeyToAccount(KEY), get = async p => (await fetch(BASE + p)).json();
-const holderMessage = (token, code, seat, wallet) => `Monadverse Chronicle\nI hold Chog #${token}\nroom ${code}\nseat ${seat}\nwallet ${wallet.toLowerCase()}`;
+const holderMessage = (token, code, seat, wallet) => `Monorb Chronicle\nI hold Chog #${token}\nroom ${code}\nseat ${seat}\nwallet ${wallet.toLowerCase()}`;
 const until = (f, ms = 60000) => new Promise((ok, bad) => { const t0 = Date.now(), i = setInterval(() => { if (f()) { clearInterval(i); ok(); } else if (Date.now() - t0 > ms) { clearInterval(i); bad(new Error("timeout")); } }, 50); });
 const join = (code, token) => new Promise(ok => { const ws = new WebSocket(BASE.replace("http", "ws") + "/room/" + code), c = { ws, errs: [] };
   ws.onmessage = async e => { const m = JSON.parse(e.data); if (m.t === "lobby") c.lobby = m; if (m.t === "s") c.last = m.s; if (m.t === "err") c.errs.push(m.why);

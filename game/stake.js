@@ -6,7 +6,7 @@ const h32 = v => BigInt(v).toString(16).padStart(64, "0"), addr = a => a.toLower
 const rpc = async (method, params) => { const r = await (await fetch(C.rpc, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) })).json(); if (r.error) throw new Error(r.error.message); return r.result; };
 const call = (to, data) => rpc("eth_call", [{ to, data }, "latest"]);
 const word = (hex, i) => hex.slice(2 + i * 64, 2 + i * 64 + 64);
-export const bindMessage = (code, matchId, seat, address) => `Monadverse Bonk Arena\nroom ${code}\nmatch ${matchId}\nseat ${seat}\nwallet ${address.toLowerCase()}`;
+export const bindMessage = (code, matchId, seat, address) => `Monorb Bonk Arena\nroom ${code}\nmatch ${matchId}\nseat ${seat}\nwallet ${address.toLowerCase()}`;
 
 export async function account() {
   const [a] = await W().request({ method: "eth_requestAccounts" });

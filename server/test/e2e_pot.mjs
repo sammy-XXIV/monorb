@@ -15,7 +15,7 @@ const abi = parseAbi(["function mint(address,uint256)", "function ownerOf(uint25
 const pub = createPublicClient({ chain: foundry, transport: http(RPC) }), acc = k => privateKeyToAccount(KEYS[k]);
 const tx = async (k, address, functionName, args) => pub.waitForTransactionReceipt({ hash: await createWalletClient({ account: acc(k), chain: foundry, transport: http(RPC) }).writeContract({ address, abi, functionName, args }) });
 const bal = a => pub.readContract({ address: TOKEN, abi, functionName: "balanceOf", args: [a] });
-const bindMessage = (code, matchId, seat, address) => `Monadverse Bonk Arena\nroom ${code}\nmatch ${matchId}\nseat ${seat}\nwallet ${address.toLowerCase()}`;
+const bindMessage = (code, matchId, seat, address) => `Monorb Bonk Arena\nroom ${code}\nmatch ${matchId}\nseat ${seat}\nwallet ${address.toLowerCase()}`;
 const until = (f, ms = 60000) => new Promise((ok, bad) => { const t0 = Date.now(), i = setInterval(() => { if (f()) { clearInterval(i); ok(); } else if (Date.now() - t0 > ms) { clearInterval(i); bad(new Error("timeout")); } }, 50); });
 const join = (code, token) => new Promise(ok => { const ws = new WebSocket(BASE.replace("http", "ws") + "/room/" + code), c = { ws, errs: [] };
   ws.onmessage = e => { const m = JSON.parse(e.data); if (m.t === "lobby") c.lobby = m; if (m.t === "s") c.last = m.s; if (m.t === "err") c.errs.push(m.why); if (m.t === "result") c.result = m; if (m.t === "welcome") { c.id = m.id; ok(c); } };

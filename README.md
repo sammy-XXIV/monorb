@@ -1,4 +1,4 @@
-# Monadverse: relive the story as your own Chog
+# Monorb: relive the Monadverse story as your own Chog
 
 A browser 3D game built for **Chogathon 2026**. You play the Monadverse story (Molandak vs Mongrod) as **your own Chog Genesis NFT**. Its traits build your 3D character and change how you play. You can also fight other Chogs live in **Bonk Arena**. Every Chog keeps a **Chronicle**, a history that stays with the NFT when it changes hands.
 

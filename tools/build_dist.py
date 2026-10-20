@@ -15,6 +15,6 @@ for pat in ["game/index.html", "game/*.js", "game/chapters/*.js", "game/engine/*
             "salmonad/salmonad.js", "mouch/mouch.js", "mongrod/mongrod.js", "mongrod/cyborg.js"]:
     cp(pat)
 (OUT / "game/main_v1_prototype.js").unlink(missing_ok=True)
-(OUT / "index.html").write_text('<!doctype html><meta charset="utf-8"><title>Monadverse</title><meta http-equiv="refresh" content="0; url=game/index.html"><a href="game/index.html">Play Monadverse</a>\n')
+(OUT / "index.html").write_text('<!doctype html><meta charset="utf-8"><title>Monorb</title><meta http-equiv="refresh" content="0; url=game/index.html"><a href="game/index.html">Play Monorb</a>\n')
 n = sum(1 for _ in OUT.rglob("*") if _.is_file()); size = sum(f.stat().st_size for f in OUT.rglob("*") if f.is_file())
 print(f"dist/: {n} files, {size / 1e6:.1f} MB")

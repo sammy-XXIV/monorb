@@ -1,4 +1,4 @@
-export const TITLE = "Monadverse";
+export const TITLE = "Monorb";
 export const CONTRACT = "0xc96d31F8626c6D03Fae5dCD3d61e3FB9F4a73763";   // Chog Genesis
 export const CHAIN_ID = 143;                                             // Monad mainnet
 export const GUEST_TOKEN = 1462;

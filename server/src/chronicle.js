@@ -21,8 +21,8 @@ export function applyEvent(rec, ev, at = Date.now()) {
 }
 
 // the texts a holder signs (bound to the token, the wallet and what is being claimed)
-export const verifyMessage = (token, code, seat, wallet) => `Monadverse Chronicle\nI hold Chog #${token}\nroom ${code}\nseat ${seat}\nwallet ${wallet.toLowerCase()}`;
-export const storyMessage = (token, chapter, wallet) => `Monadverse Chronicle\nChog #${token} finished chapter ${chapter}\nwallet ${wallet.toLowerCase()}`;
+export const verifyMessage = (token, code, seat, wallet) => `Monorb Chronicle\nI hold Chog #${token}\nroom ${code}\nseat ${seat}\nwallet ${wallet.toLowerCase()}`;
+export const storyMessage = (token, chapter, wallet) => `Monorb Chronicle\nChog #${token} finished chapter ${chapter}\nwallet ${wallet.toLowerCase()}`;
 
 // ---- leaderboard: top Chogs by arena wins (then captures, then chapters) ----
 export const BOARD_SIZE = 50;

@@ -17,7 +17,7 @@ async function holds(env, token, wallet) {
 }
 const chronicle = env => env.CHRONICLE.get(env.CHRONICLE.idFromName("all"));
 // the exact text a player signs to bind their wallet to their seat in this room (room + match + seat: no replay elsewhere)
-export const bindMessage = (code, matchId, seat, address) => `Monadverse Bonk Arena
+export const bindMessage = (code, matchId, seat, address) => `Monorb Bonk Arena
 room ${code}
 match ${matchId}
 seat ${seat}
@@ -52,7 +52,7 @@ export default {
       } catch (e) { return Response.json({ error: e.shortMessage || e.message }, { status: 400, headers: CORS }); }
     }
     if (m && CODE.test(m[1].toUpperCase())) { const code = m[1].toUpperCase(); const r = new Request(req); r.headers.set("X-Room", code); return env.ROOMS.get(env.ROOMS.idFromName(code)).fetch(r); }
-    return new Response("Monadverse arena", { headers: CORS });
+    return new Response("Monorb arena", { headers: CORS });
   },
 };
 

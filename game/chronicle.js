@@ -5,9 +5,9 @@ export const getChronicle = async token => (await fetch(`${ARENA_URL}/chog/${tok
 export const getJSON = async path => (await fetch(ARENA_URL + path)).json();   // /board, /world, /daily
 const hex = s => "0x" + Array.from(new TextEncoder().encode(s), b => b.toString(16).padStart(2, "0")).join("");
 export const sign = (wallet, message) => window.ethereum.request({ method: "personal_sign", params: [hex(message), wallet] });
-export const holderMessage = (token, code, seat, wallet) => `Monadverse Chronicle\nI hold Chog #${token}\nroom ${code}\nseat ${seat}\nwallet ${wallet.toLowerCase()}`;
+export const holderMessage = (token, code, seat, wallet) => `Monorb Chronicle\nI hold Chog #${token}\nroom ${code}\nseat ${seat}\nwallet ${wallet.toLowerCase()}`;
 export async function writeChapter(token, chapter, wallet) {
-  const sig = await sign(wallet, `Monadverse Chronicle\nChog #${token} finished chapter ${chapter}\nwallet ${wallet.toLowerCase()}`);
+  const sig = await sign(wallet, `Monorb Chronicle\nChog #${token} finished chapter ${chapter}\nwallet ${wallet.toLowerCase()}`);
   const r = await (await fetch(`${ARENA_URL}/chog/${token}/story`, { method: "POST", body: JSON.stringify({ chapter, wallet, sig }) })).json();
   if (r.error) throw new Error(r.error); return r;
 }
