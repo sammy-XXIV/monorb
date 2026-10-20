@@ -1,0 +1,32 @@
+# build + deps
+dist/
+**/node_modules/
+server/.wrangler/
+contracts/out/
+contracts/cache/
+contracts/lib/
+game/assets/_dl/
+# secrets (local dev values only; production key lives in a Cloudflare secret)
+.dev.vars
+**/.env
+# work files: render shots, logs, references (reference art belongs to its owners), old copies
+*.png
+!game/assets/**/*.png
+!molandak/face.png
+!moyaki/face.png
+*.log
+*.blend
+*.blend1
+refs/
+_prev/
+doctor/
+sheet_small.png
+game/main_v1_prototype.js
+# Kenney kits: the game only loads the GLB/GLTF models + audio
+game/assets/kenney_*/Models/*
+!game/assets/kenney_*/Models/GLB format/
+!game/assets/kenney_nature-kit/Models/GLTF format/
+game/assets/kenney_*/Previews/
+game/assets/kenney_nature-kit/Isometric/
+game/assets/kenney_nature-kit/Side/
+game/assets/kenney_*/*.png

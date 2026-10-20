@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mongrod 3D</title>
+<style>
+  html,body { margin:0; height:100%; overflow:hidden; background:#1a1a1a; font-family:"Space Grotesk",system-ui,sans-serif; color:#fff; }
+  #ref { position:fixed; top:12px; right:12px; width:min(300px,40vw); border:2px solid #000; border-radius:10px; }
+  #hint { position:fixed; bottom:12px; left:50%; transform:translateX(-50%); background:#1b1530ee; border:2px solid #000; border-radius:999px; padding:7px 14px; font-size:13px; white-space:nowrap; }
+</style>
+</head>
+<body>
+<img id="ref" src="../refs/Neon Crystal Dragon Character Turnaround.png" alt="Mongrod turnaround reference">
+<div id="hint">Drag to orbit · scroll to zoom</div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { buildMongrod } from "./mongrod.js";
+import { createGfx, outline } from "../game/engine/gfx.js";
+const Q = new URLSearchParams(location.search);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x231a5c);
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 100);
+const az = (+Q.get("az") || 0) * Math.PI / 180; camera.position.set(Math.sin(az) * 15, 3.0, Math.cos(az) * 15);
+const view = document.createElement("div"); view.style.cssText = "position:fixed;inset:0"; document.body.prepend(view);
+const gfx = createGfx(view, scene, camera, { lineWidth: 0.01 }), renderer = gfx.renderer;
+Object.assign(gfx.bloom, { strength: 1.1, radius: 0.65, threshold: 0.95 });   // crystal glow halo
+const controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 2.2, 0); controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x443355, 2.0));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(4, 9, 7); sun.castShadow = true; scene.add(sun);
+const floor = new THREE.Mesh(new THREE.CircleGeometry(4, 48), new THREE.MeshLambertMaterial({ color: 0x2a2a30 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+const doc = buildMongrod(); scene.add(doc);
+// outlines like the drawing: one line wherever colour regions meet + the silhouette; each crystal leaf outlined on its own
+const parts = [], ids = new Map(); let nid = 100;
+doc.traverse(m => {
+  if (!m.isMesh || m.material.isMeshBasicMaterial && m.parent && m.parent.children[0] !== m && m.parent.children.length === 2) return;   // crystal cores: no line
+  const crystal = m.material.vertexColors && m.material.flatShading;
+  const key = crystal ? "c" + (nid++) : "#" + (m.material.color ? m.material.color.getHexString() : m.uuid) + (m.material.vertexColors ? "v" + m.uuid : "");
+  if (!ids.has(key)) ids.set(key, nid++);
+  outline(m, ids.get(key)); parts.push(m);
+});
+const PART = Q.get("part");
+if (PART) document.getElementById("ref").style.display = "none";
+if (PART === "head") {                                    // step 1: head only, framed close
+  const head = doc.userData.head; doc.children.slice().forEach(c => { if (c !== head) c.visible = false; });
+  const b = new THREE.Box3().setFromObject(head), c = b.getCenter(new THREE.Vector3());
+  const el = (+Q.get("el") || 0) * Math.PI / 180; controls.target.copy(c); camera.position.set(c.x + Math.sin(az) * Math.cos(el) * 11, c.y + 0.3 + Math.sin(el) * 11, c.z + Math.cos(az) * Math.cos(el) * 11); camera.fov = 26; camera.updateProjectionMatrix(); floor.visible = false;
+}
+
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+(function loop(){ requestAnimationFrame(loop); controls.update(); gfx.render(parts); })();
+</script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chog Head 3D</title>
+<style>
+  html,body{margin:0;height:100%;background:#5b6cf7;font-family:"Space Grotesk",system-ui,sans-serif;overflow:hidden}
+  canvas{display:block}
+  #panel{position:fixed;top:16px;left:16px;background:#1b1530ee;color:#fff;border:2px solid #000;border-radius:10px;padding:12px 16px;font-size:13px}
+  #ref{position:fixed;top:16px;right:16px;width:400px;max-width:45vw;border:2px solid #000;border-radius:10px}
+  #hint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#1b1530ee;color:#fff;border:2px solid #000;border-radius:999px;padding:8px 16px;font-size:13px;white-space:nowrap}
+  button{font:inherit;background:#8b6cff;color:#fff;border:2px solid #000;border-radius:8px;padding:5px 10px;cursor:pointer;margin:6px 6px 0 0}
+</style>
+</head>
+<body>
+<div id="panel"><b>STEP 2 · FACE + HAIR</b><br><span id="st">loading…</span><br><button id="spin">Auto-rotate: on</button><button id="ink">Ink lines: off</button></div>
+<img id="ref" src="ref.png" alt="Reference: turnaround front, left and back views">
+<div id="hint">Drag to orbit 360° · scroll to zoom</div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x5b6cf7);
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 100); const az = parseFloat(new URLSearchParams(location.search).get("az") || 0) * Math.PI / 180;
+camera.position.set(Math.sin(az) * 9, 0.6, Math.cos(az) * 9);
+const renderer = new THREE.WebGLRenderer({antialias: true}); renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight); renderer.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 0.6, 0); controls.enableDamping = true; controls.autoRotate = !location.search.includes("still"); controls.autoRotateSpeed = 2;
+let inkOn = false;   // inner ink lines off: outline only
+document.getElementById("spin").onclick = e => { controls.autoRotate = !controls.autoRotate; e.target.textContent = "Auto-rotate: " + (controls.autoRotate ? "on" : "off"); };
+document.getElementById("ink").onclick = e => { inkOn = !inkOn; e.target.textContent = "Ink lines: " + (inkOn ? "on" : "off"); };
+
+scene.add(new THREE.AmbientLight(0xffffff, 2.6));
+const sun = new THREE.DirectionalLight(0xffffff, 0.6);   // soft, low contrast: the drawing is near-flat colour sun.position.set(2, 4, 4); scene.add(sun);
+// two crisp tones (lit / shadow), like the flat-shaded drawing
+const tones = new THREE.DataTexture(new Uint8Array([120, 255]), 2, 1, THREE.RedFormat);
+tones.minFilter = tones.magFilter = THREE.NearestFilter; tones.needsUpdate = true;
+
+const shells = [], parts = [];
+const normalMat = new THREE.MeshNormalMaterial(), flatNormal = new THREE.MeshBasicMaterial({color: 0xff0000});   // pure red never occurs as a real normal -> marks face pixels
+const loader = new GLTFLoader(); let n = 0;
+for (const file of ["../face/face.glb", "hair.glb"]) loader.load(file, g => {
+  const meshes = []; g.scene.traverse(o => o.isMesh && meshes.push(o));   // collect first: adding outlines mid-traverse recurses forever
+  meshes.forEach(m => {
+    const tex = m.material.map;
+    if (m.name.startsWith("ink")) { m.visible = false; return; }   // traced spike strokes: removed (looked like scratches)
+    // face drawn slightly toward the camera so the hair's outline shell can't poke through it
+    m.material = tex ? new THREE.MeshBasicMaterial({map: tex, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8}) : new THREE.MeshLambertMaterial({color: m.material.color});
+    m.userData.inkMat = tex ? flatNormal : normalMat;   // face art: no fold lines inside it, only where it meets the hair
+    // outer outline: copy pushed out along the normals
+    const og = m.geometry.clone(); if (!og.attributes.normal) og.computeVertexNormals();
+    const p = og.attributes.position, nrm = og.attributes.normal, w = tex ? 0.008 : 0.012;
+    for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) + nrm.getX(i) * w, p.getY(i) + nrm.getY(i) * w, p.getZ(i) + nrm.getZ(i) * w);
+    parts.push(m);
+    if (tex) return;                                  // outline is for the hair only
+    const shell = new THREE.Mesh(og, new THREE.MeshBasicMaterial({color: 0x111111, side: THREE.BackSide})); m.add(shell); shells.push(shell);
+  });
+  scene.add(g.scene); document.getElementById("st").textContent = (++n) + "/2 parts loaded";
+}, undefined, e => document.getElementById("st").textContent = "load failed: " + e.message);
+
+// ---- ink lines: screen-space edges from a normal + depth pass (folds, overlapping spikes, nose) ----
+const size = new THREE.Vector2();
+const rtColor = new THREE.WebGLRenderTarget(1, 1, {samples: 4});
+const rtNormal = new THREE.WebGLRenderTarget(1, 1); rtNormal.depthTexture = new THREE.DepthTexture(1, 1);
+const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const inkMat = new THREE.ShaderMaterial({
+  uniforms: {tColor: {value: rtColor.texture}, tNormal: {value: rtNormal.texture}, tDepth: {value: rtNormal.depthTexture},
+             px: {value: new THREE.Vector2()}, near: {value: camera.near}, far: {value: camera.far}},
+  vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
+  fragmentShader: `
+    #include <packing>
+    uniform sampler2D tColor, tNormal, tDepth; uniform vec2 px; uniform float near, far; varying vec2 vUv;
+    float vz(vec2 uv){ return -perspectiveDepthToViewZ(texture2D(tDepth, uv).x, near, far); }
+    void main(){
+      vec4 col = texture2D(tColor, vUv);
+      vec3 c0 = texture2D(tNormal, vUv).xyz; vec3 n0 = c0 * 2.0 - 1.0; float d0 = vz(vUv);
+      bool face0 = c0.r > 0.98 && c0.g < 0.02 && c0.b < 0.02;
+      float e = 0.0;
+      for (int i = 0; i < 4; i++) {
+        vec2 o = (i == 0 ? vec2(1, 0) : i == 1 ? vec2(-1, 0) : i == 2 ? vec2(0, 1) : vec2(0, -1)) * px * 1.0;
+        vec3 c1 = texture2D(tNormal, vUv + o).xyz; vec3 n1 = c1 * 2.0 - 1.0; float d1 = vz(vUv + o);
+        if (face0 || (c1.r > 0.98 && c1.g < 0.02 && c1.b < 0.02)) continue;   // no ink on or against the face: hair lines only
+        if (d0 < 50.0 && d1 < 50.0) e = max(e, smoothstep(0.3, 0.55, 1.0 - dot(n0, n1)));   // fold / crease
+        if (d0 < 50.0 && d1 < 50.0) e = max(e, smoothstep(0.03, 0.06, abs(d1 - d0) / d0));   // overlap inside the model only (outline draws the silhouette)
+      }
+      gl_FragColor = vec4(mix(col.rgb, vec3(0.0055), e), 1.0);   // linear-space ink (~#111 on screen)
+      #include <colorspace_fragment>
+    }`
+});
+const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), inkMat); const quadScene = new THREE.Scene(); quadScene.add(quad);
+function resize(){
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);
+  renderer.getDrawingBufferSize(size); rtColor.setSize(size.x, size.y); rtNormal.setSize(size.x, size.y);
+  rtNormal.depthTexture.image.width = size.x; rtNormal.depthTexture.image.height = size.y; inkMat.uniforms.px.value.set(1 / size.x, 1 / size.y);
+}
+addEventListener("resize", resize); resize();
+(function loop(){
+  requestAnimationFrame(loop); controls.update();
+  if (!inkOn) { renderer.setRenderTarget(null); renderer.render(scene, camera); return; }
+  renderer.setRenderTarget(rtColor); renderer.render(scene, camera);
+  shells.forEach(s => s.visible = false); const bg = scene.background; scene.background = null;
+  parts.forEach(m => { m.userData.mat = m.material; m.material = m.userData.inkMat; });
+  renderer.setRenderTarget(rtNormal); renderer.setClearColor(0x8080ff, 1); renderer.clear(); renderer.render(scene, camera);
+  parts.forEach(m => m.material = m.userData.mat); scene.background = bg; shells.forEach(s => s.visible = true);
+  renderer.setRenderTarget(null); renderer.render(quadScene, quadCam);
+})();
+</script>
+</body>
+</html>

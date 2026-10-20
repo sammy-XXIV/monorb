@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chog Face 3D</title>
+<style>
+  html,body{margin:0;height:100%;background:#5b6cf7;font-family:"Space Grotesk",system-ui,sans-serif;overflow:hidden}
+  canvas{display:block}
+  #panel{position:fixed;top:16px;left:16px;background:#1b1530ee;color:#fff;border:2px solid #000;border-radius:10px;padding:12px 16px;font-size:13px}
+  #ref{position:fixed;top:16px;right:16px;width:260px;border:2px solid #000;border-radius:10px}
+  #hint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#1b1530ee;color:#fff;border:2px solid #000;border-radius:999px;padding:8px 16px;font-size:13px;white-space:nowrap}
+  button{font:inherit;background:#8b6cff;color:#fff;border:2px solid #000;border-radius:8px;padding:5px 10px;cursor:pointer;margin-top:6px}
+</style>
+</head>
+<body>
+<div id="panel"><b>STEP 1 · FACE ONLY</b><br><span id="st">loading…</span><br><button id="spin">Auto-rotate: on</button></div>
+<img id="ref" src="ref.png" alt="Reference: turnaround front and left view">
+<div id="hint">Drag to orbit 360° · scroll to zoom</div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x5b6cf7);
+const camera = new THREE.PerspectiveCamera(35, innerWidth/innerHeight, 0.1, 100); camera.position.set(0, 0, 6);
+const renderer = new THREE.WebGLRenderer({antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight); renderer.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.autoRotate = true; controls.autoRotateSpeed = 2;
+document.getElementById("spin").onclick = e => { controls.autoRotate = !controls.autoRotate; e.target.textContent = "Auto-rotate: " + (controls.autoRotate ? "on" : "off"); };
+new GLTFLoader().load("face.glb", g => {
+  const meshes = []; g.scene.traverse(o => o.isMesh && meshes.push(o));   // collect first: adding outlines mid-traverse recurses forever
+  meshes.forEach(m => {
+    // flat, unlit art like the 2D reference; black back-face shell = cartoon outline
+    m.material = new THREE.MeshBasicMaterial({map: m.material.map || null, color: m.material.map ? 0xffffff : m.material.color, side: THREE.DoubleSide});
+    const o = new THREE.Mesh(m.geometry, new THREE.MeshBasicMaterial({color: 0x111111, side: THREE.BackSide})); o.scale.setScalar(1.025); m.add(o);
+  });
+  scene.add(g.scene); document.getElementById("st").textContent = "face.glb loaded";
+}, undefined, e => document.getElementById("st").textContent = "load failed: " + e.message);
+addEventListener("resize", () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+(function loop(){ requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+</script>
+</body>
+</html>

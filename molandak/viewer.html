@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Molandak 3D</title>
+<style>
+  html,body { margin:0; height:100%; overflow:hidden; background:#1a1a1a; font-family:"Space Grotesk",system-ui,sans-serif; color:#fff; }
+  #ref { position:fixed; top:12px; right:12px; width:min(300px,40vw); border:2px solid #000; border-radius:10px; }
+  #hint { position:fixed; bottom:12px; left:50%; transform:translateX(-50%); background:#1b1530ee; border:2px solid #000; border-radius:999px; padding:7px 14px; font-size:13px; white-space:nowrap; }
+</style>
+</head>
+<body>
+<img id="ref" src="../refs/4bc7f159-ee78-49a1-9796-63db91eb734e.png" alt="Molandak turnaround reference">
+<div id="hint">Drag to orbit · scroll to zoom</div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { buildMolandak } from "./molandak.js";
+const Q = new URLSearchParams(location.search);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1d1d1f);
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 100);
+const az = (+Q.get("az") || 0) * Math.PI / 180; camera.position.set(Math.sin(az) * 13, 3.2, Math.cos(az) * 13);
+const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true; renderer.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 2.2, 0); controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x443355, 2.0));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(4, 9, 7); sun.castShadow = true; scene.add(sun);
+const floor = new THREE.Mesh(new THREE.CircleGeometry(4, 48), new THREE.MeshLambertMaterial({ color: 0x2a2a30 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+const mol = buildMolandak(); scene.add(mol);
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+(function loop(){ requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+</script>
+</body>
+</html>

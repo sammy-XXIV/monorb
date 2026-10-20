@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Monadverse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --panel:#1b1530ee; --accent:#8b6cff; --text:#fff; }
+  html,body { margin:0; height:100%; overflow:hidden; background:#2a2140; font-family:"Space Grotesk",system-ui,sans-serif; color:var(--text); user-select:none; }
+  #view { position:fixed; inset:0; touch-action:none; }
+  .screen { position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding:16px; box-sizing:border-box; pointer-events:none; }
+  .screen.on { display:flex; }
+  .card { box-sizing:border-box; pointer-events:auto; background:var(--panel); border:2px solid #000; border-radius:14px; padding:18px 20px; max-width:440px; width:100%; box-shadow:0 6px 0 #000; }
+  h1 { margin:0 0 4px; font-size:44px; letter-spacing:1px; text-shadow:3px 3px 0 #000; }
+  h2 { margin:0 0 8px; font-size:22px; }
+  p { margin:6px 0; line-height:1.5; font-size:15px; }
+  .muted { color:#c9bff5; font-size:13px; }
+  button, input { font:inherit; font-size:15px; }
+  button { background:var(--accent); color:#fff; border:2px solid #000; border-radius:10px; padding:9px 14px; cursor:pointer; margin:8px 8px 0 0; box-shadow:0 3px 0 #000; }
+  button:active { transform:translateY(2px); box-shadow:0 1px 0 #000; }
+  button.ghost { background:#2d2550; }
+  input { width:90px; padding:8px; border:2px solid #000; border-radius:8px; }
+  #title { display:none; padding:28px 32px; }
+  #title.on { display:block; }
+  #title > * { pointer-events:auto; }
+  .tTop { position:absolute; left:32px; top:24px; }
+  #ttl { font-size:64px; margin:0; letter-spacing:2px; text-transform:uppercase; text-shadow:4px 4px 0 #000; }
+  .tag { margin:2px 0 10px; color:#c9bff5; font-size:16px; }
+  .chips { display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
+  .chip { background:var(--panel); border:2px solid #000; border-radius:10px; padding:5px 10px; font-size:13px; max-width:340px; }
+  .chip:empty { display:none; }
+  .tIcons { position:absolute; right:24px; top:20px; display:flex; gap:8px; }
+  .icon { width:46px; height:46px; border-radius:50%; padding:0; margin:0; font-size:20px; background:var(--panel); }
+  .tMenu { position:absolute; left:32px; bottom:28px; width:min(360px, 42vw); }
+  #who { font-size:16px; margin:0 0 10px; text-shadow:2px 2px 0 #000; }
+  .big { font-size:20px; padding:14px 28px; margin:0; display:block; width:100%; }
+  .link { background:none; border:none; box-shadow:none; color:#c9bff5; padding:6px 0; margin:6px 0 0; text-decoration:underline; }
+  .link:active { transform:none; }
+  #connectRow details { margin-top:6px; font-size:12px; }
+  .mItem { display:grid; grid-template-columns:44px 1fr; grid-template-rows:auto auto; align-items:center; text-align:left; width:100%; margin:0 0 10px; padding:12px 16px; background:var(--panel); }
+  .mItem span { grid-row:1 / 3; font-size:26px; }
+  .mItem b { font-size:22px; letter-spacing:1px; text-transform:uppercase; }
+  .mItem small { color:#c9bff5; font-size:13px; }
+  .mItem:hover { background:#3a2e6a; } #menuStory { background:var(--accent); } #menuStory small { color:#efe9ff; }
+  .card.wide { max-width:860px; max-height:calc(100vh - 32px); overflow:auto; }
+  #chapters { display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:12px; margin:10px 0; }
+  .chap { position:relative; padding:0; margin:0; border-radius:10px; overflow:hidden; background:#000; text-align:left; }
+  .chap img, .chap .ph { width:100%; aspect-ratio:3 / 4; object-fit:cover; display:block; }
+  .chap .ph { background:linear-gradient(#3a2a6a,#1a1230); }
+  .chap div { position:absolute; left:0; right:0; bottom:0; padding:6px 8px; background:#000c; font-size:12px; line-height:1.3; }
+  .chap.locked img, .chap.locked .ph { filter:grayscale(1) brightness(.45); } .chap.locked { cursor:default; }
+  .chap.locked:active { transform:none; }
+  #nameCard { top:auto !important; bottom:6vh; left:62% !important; }
+  #nameCard:empty, #title:not(.on) ~ #nameCard { display:none; }
+  @media (max-width:820px), (max-height:500px) { #ttl { font-size:34px; } .tag { font-size:13px; margin-bottom:6px; } .chip { font-size:11px; padding:3px 8px; max-width:260px; }
+    .tTop { left:16px; top:10px; } .tMenu { left:16px; bottom:12px; width:min(300px, 44vw); } .mItem { padding:7px 12px; margin-bottom:6px; } .mItem b { font-size:16px; } .mItem span { font-size:20px; } .mItem small { font-size:11px; }
+    .big { font-size:16px; padding:10px 18px; } #who { font-size:13px; margin-bottom:6px; } .icon { width:38px; height:38px; font-size:16px; } .tIcons { right:14px; top:10px; } #chapters { grid-template-columns:repeat(5, 1fr); gap:8px; } }
+  #pickList button { margin:4px 6px 0 0; padding:6px 10px; }
+  #traits { font-size:13px; line-height:1.5; margin-top:8px; } #traits b { color:#b9a6ff; }
+  #intro img { width:100%; max-width:240px; display:block; margin:0 auto 10px; border:2px solid #000; border-radius:10px; }
+  #hud { position:fixed; inset:12px 12px auto 12px; display:none; justify-content:space-between; align-items:flex-start; gap:8px; pointer-events:none; }
+  #hud.on { display:flex; }
+  .pill { background:var(--panel); border:2px solid #000; border-radius:999px; padding:7px 14px; font-size:14px; }
+  #obj { position:fixed; top:58px; left:50%; transform:translateX(-50%); display:none; text-align:center; max-width:90vw; }
+  #obj.on { display:block; }
+  #hearts { font-size:20px; letter-spacing:2px; color:#ff6a9a; }
+  #prompt { position:fixed; bottom:96px; left:50%; transform:translateX(-50%); display:none; }
+  #prompt.on { display:block; }
+  #dlg { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); width:min(680px, calc(100vw - 32px)); box-sizing:border-box; display:none; pointer-events:auto; }
+  #dlg.on { display:block; }
+  #dlg .who { color:#b9a6ff; font-weight:700; margin-bottom:4px; }
+  #help { position:fixed; bottom:12px; left:50%; transform:translateX(-50%); display:none; font-size:12px; text-align:center; }
+  #help.on { display:block; }
+  #flash { position:fixed; inset:0; background:#ff2a4a; opacity:0; pointer-events:none; transition:opacity .25s; }
+  #loading { position:fixed; inset:0; display:none; align-items:center; justify-content:center; font-size:20px; background:#1a1230; }
+  #loading.on { display:flex; }
+  @media (max-width:520px) { h1 { font-size:34px; } }
+  @media (max-height:500px) { h1 { font-size:26px; } .card { padding:10px 14px; max-height:calc(100vh - 24px); overflow:auto; } #intro img { max-height:38vh; width:auto; } h2 { font-size:18px; margin-bottom:4px; } p { margin:3px 0; font-size:13px; } button { padding:6px 12px; margin-top:6px; } #nameCard { left:72% !important; top:12px !important; font-size:14px !important; } }
+  #cine { display:none; position:fixed; inset:0; z-index:20; }
+  #cine.on { display:block; }
+  #cine .bar { position:absolute; left:0; right:0; height:9vh; background:#000; }
+  #cineSub { display:none; position:absolute; left:50%; bottom:calc(9vh + 12px); transform:translateX(-50%); width:min(680px, calc(100vw - 32px)); }
+  #cineSub.on { display:block; }
+  #cineSub .who { color:#b9a6ff; font-weight:700; margin-bottom:4px; }
+  #cineSkip { position:absolute; right:16px; top:calc(9vh + 10px); margin:0; }
+  #touch { display:none; position:fixed; inset:0; pointer-events:none; -webkit-touch-callout:none; }
+  #touch.on { display:block; }
+  #stick { position:fixed; left:28px; bottom:28px; width:132px; height:132px; border-radius:50%; background:#1b153088; border:2px solid #000; pointer-events:auto; touch-action:none; }
+  #knob { position:absolute; left:50%; top:50%; width:56px; height:56px; margin:-28px 0 0 -28px; border-radius:50%; background:var(--accent); border:2px solid #000; box-shadow:0 3px 0 #000; }
+  .tb { position:fixed; width:68px; height:68px; border-radius:50%; margin:0; padding:0; font-size:13px; font-weight:700; pointer-events:auto; touch-action:none; }
+  #tbJump { right:28px; bottom:28px; width:80px; height:80px; }
+  #tbSpin { right:122px; bottom:24px; background:#2d2550; }
+  #tbTalk { right:40px; bottom:126px; background:#2d2550; display:none; }
+  #arenaLobby { justify-content:flex-start; align-items:center; }
+  #arenaLobby .card { max-width:420px; }
+  #arPotRow { display:flex; align-items:center; gap:8px; } #arPotRow button { margin-right:0; }
+  @media (max-height:500px) { #arenaLobby .card { max-width:460px; font-size:13px; } #arenaLobby h2 { font-size:18px; margin:0 0 2px; } #arenaLobby p { margin:2px 0; font-size:12px; } #arenaLobby button { padding:5px 10px; font-size:13px; margin-top:4px; } #arPlayers { line-height:1.4 !important; } }
+  #arHud { display:none; position:fixed; inset:0; pointer-events:none; }
+  #arHud.on { display:block; }
+  #arScore { position:fixed; top:12px; left:50%; transform:translateX(-50%); font-size:14px; white-space:nowrap; }
+  #arScore:empty { display:none; }
+  #arBanner { position:fixed; top:34%; left:50%; transform:translate(-50%,-50%) scale(.6); font-size:56px; font-weight:700; text-shadow:4px 4px 0 #000; opacity:0; transition:all .25s cubic-bezier(.2,1.6,.4,1); text-align:center; }
+  #arBanner.on { opacity:1; transform:translate(-50%,-50%) scale(1); }
+  .arTag { position:fixed; left:0; top:0; font-size:12px; padding:3px 9px; white-space:nowrap; }
+  @media (max-height:500px) { #arBanner { font-size:36px; } }
+  #rotate { position:fixed; inset:0; z-index:99; display:none; flex-direction:column; align-items:center; justify-content:center; gap:12px; background:#1a1230; font-size:20px; text-align:center; padding:16px; }
+  #rotate span { font-size:56px; }
+  @media (orientation:portrait) and (pointer:coarse) { #rotate { display:flex; } }
+</style>
+</head>
+<body>
+<div id="view"></div>
+<div id="flash"></div>
+
+<div id="title" class="screen on">
+  <div class="tTop"><h1 id="ttl">Monadverse</h1><p class="tag">Relive the story as your own Chog.</p>
+    <div class="chips"><span class="chip" id="daily"></span><span class="chip" id="world"></span></div></div>
+  <div class="tIcons"><button id="boardBtn" class="icon" title="Leaderboard">🏆</button><button id="credBtn" class="icon" title="Credits">ⓘ</button></div>
+  <div class="tMenu">
+    <p id="who">A plain Chog. Connect your wallet to become <b>yours</b>.</p>
+    <div id="connectRow"><button id="connect" class="big">Connect wallet</button><button id="guest" class="link">or play as guest ›</button>
+      <details class="muted"><summary>Guest: pick any token #</summary>Chog # <input id="tok" type="number" min="1" max="1969" value="1462"> <button id="rnd" class="ghost">Go</button></details></div>
+    <div id="pick" style="display:none"><p class="muted">Pick your Chog:</p><div id="pickList"></div></div>
+    <div id="playRow" style="display:none">
+      <button id="menuStory" class="mItem"><span>▶</span><b>Story</b><small id="storySub">Chapter 1 · The Genesis</small></button>
+      <button id="arenaBtn" class="mItem"><span>⚔</span><b>Bonk Arena</b><small id="arenaSub">PvP · stake your Chog</small></button>
+      <button id="menuChron" class="mItem"><span>📜</span><b>Chronicle</b><small>Your Chog's history & traits</small></button>
+      <button id="again" class="link">Change Chog</button>
+    </div>
+  </div>
+</div>
+<div id="story" class="screen"><div class="card wide"><h2>Story · Monadverse Season 1</h2><div id="chapters"></div><button id="storyBack" class="ghost">Back</button></div></div>
+<div id="chronScreen" class="screen"><div class="card wide"><h2 id="chronTitle">📜 Chronicle</h2>
+  <div id="traits"></div><p class="muted" id="perks"></p><p class="muted" id="prog"></p>
+  <div class="muted" id="chron" style="font-size:13px;line-height:1.5;margin:6px 0"></div>
+  <button id="chronBack">Back</button></div></div>
+  <div id="traits"></div>
+  <p class="muted" id="perks"></p>
+  <p class="muted" id="prog"></p>
+  <div class="muted" id="chron" style="font-size:13px;line-height:1.5;margin:6px 0"></div>
+  <div class="muted" id="daily" style="font-size:13px;margin:4px 0"></div>
+  <div class="muted" id="world" style="font-size:13px;margin:4px 0 6px"></div>
+  <div id="playRow" style="display:none"><button id="play">Play Chapter 1</button><button id="play2" style="display:none">Chapter 2</button><button id="arenaBtn">Bonk Arena · PvP</button><button id="again" class="ghost">Change Chog</button></div>
+  <button id="boardBtn" class="ghost">Leaderboard</button><button id="credBtn" class="ghost">Credits</button>
+  <details class="muted" style="margin-top:8px"><summary>Guest: pick any token #</summary>Chog # <input id="tok" type="number" min="1" max="1969" value="1462"> <button id="rnd" class="ghost">Go</button></details>
+</div></div>
+
+<div id="nameCard" class="pill" style="position:fixed;left:50%;top:18px;transform:translateX(-50%) translateY(-120px);transition:transform .6s cubic-bezier(.2,1.6,.4,1);font-size:18px;z-index:5"></div>
+<div id="board" class="screen"><div class="card"><h2>🏆 Arena champions</h2><p class="muted">Holders only — ranked by wins, then captured Chogs.</p><div id="boardList"></div><button id="boardBack">Back</button></div></div>
+<div id="credits" class="screen"><div class="card"><h2>Credits</h2><div id="credText"></div><button id="credBack">Back</button></div></div>
+
+<div id="intro" class="screen"><div class="card" style="text-align:center">
+  <img id="introImg" src="cards/ch1.jpg" alt="Chapter 1 card">
+  <h2 id="introTitle">Chapter 1 · The Genesis</h2>
+  <p id="introText">The future is a wasteland. Mongrod burned the Elder Tree and his creatures rule the dead forest. Find the Doctor — he has a way back.</p>
+  <button id="start">Begin</button>
+</div></div>
+
+<div id="result" class="screen"><div class="card" style="text-align:center">
+  <h2 id="resTitle"></h2><p id="resText"></p>
+  <button id="resMain">Retry</button><button id="resBack" class="ghost">Title</button>
+</div></div>
+
+<div id="hud"><div class="pill" id="hearts"></div><div class="pill" id="wispC"></div><div class="pill" id="shardC"></div></div>
+<div id="obj" class="pill"></div>
+<div id="prompt" class="pill">Press F to talk</div>
+<div id="dlg" class="card"><div class="who" id="dlgWho"></div><div id="dlgText"></div><p class="muted" style="text-align:right;margin:6px 0 0">F / click to continue</p></div>
+<div id="help" class="pill">WASD move · Shift run · Space jump (twice to double-jump) · click or K spin attack · drag / Q E look · F talk</div>
+<div id="loading">Loading the ruined future…</div>
+<div id="cine"><div class="bar" style="top:0"></div><div class="bar" style="bottom:0"></div><div id="cineSub" class="card"><div class="who" id="cineWho"></div><div id="cineText"></div></div><button id="cineSkip" class="ghost">Skip ▸</button></div>
+<div id="touch"><div id="stick"><div id="knob"></div></div><button class="tb" id="tbSpin" data-key="KeyK">Spin</button><button class="tb" id="tbJump" data-key="Space">Jump</button><button class="tb" id="tbTalk" data-key="KeyF">Talk</button></div>
+<div id="arenaLobby" class="screen"><div class="card">
+  <h2>Bonk Arena</h2>
+  <p class="muted">Spin-bonk the other Chogs off the Rilla Clan platform. Last one standing wins the round — first to 3 wins the match.</p>
+  <p id="arCodeLine"></p>
+  <p id="arDaily" class="muted" style="font-size:13px"></p>
+  <details id="arHow" class="muted" style="font-size:13px;margin:4px 0"><summary><b>How to fight</b></summary>
+    <div style="line-height:1.6;margin-top:4px">🕹 <b>Move</b> WASD / stick · <b>Run</b> Shift / push the stick far<br>
+    🌀 <b>Spin</b> K, click or the Spin button — knocks Chogs near you away<br>
+    ⤴ <b>Jump</b> Space / Jump — dodge a spin (Rare+ Chogs get a second jump in the air)<br>
+    ⭕ The platform <b>shrinks</b> — last Chog standing wins the round, first to 3 wins the match<br>
+    🧬 Your traits give up to 2 perks (shown under each name): laser eyes reach further, crowns hit harder, helmets are heavier, auras block the first hit</div></details>
+  <div style="display:flex;gap:8px;align-items:center"><input id="arLink" readonly style="flex:1;width:auto;font-size:12px"><button id="arCopy" class="ghost" style="margin:0">Copy invite</button></div>
+  <div id="arPlayers" style="margin-top:10px;line-height:1.7"></div>
+  <p id="arResult" style="font-weight:700;color:#ffd36a"></p><p id="arWin"></p>
+  <div id="arStake" style="border-top:2px solid #000;margin-top:10px;padding-top:8px">
+    <p id="arStakeInfo" class="muted"></p>
+    <button id="arOpen">Stake my Chog</button><div id="arPotRow"><span class="muted">or</span><input id="arPotAmt" type="number" min="1" step="1" value="10" style="width:80px;margin-top:8px"><button id="arPot">Stake $CHOG pot</button></div><button id="arMatch" style="display:none">Match the stake</button><button id="arClaim" style="display:none">Claim the pot</button>
+    <button id="arCancel" class="ghost" style="display:none">Cancel stake</button><button id="arRefund" class="ghost" style="display:none">Refund</button>
+  </div>
+  <button id="arStart">Start the fight</button><span id="arWait" class="muted" style="display:none">Waiting for the host to start…</span>
+  <button id="arLeave" class="ghost">Leave</button>
+</div></div>
+<div id="arHud"><div id="arScore" class="pill"></div><div id="arBanner"></div><div id="arTags"></div></div>
+<div id="rotate"><span>⟳</span>Rotate your phone to landscape</div>
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module" src="main.js"></script>
+</body>
+</html>

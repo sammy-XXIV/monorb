@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chog Base 3D</title>
+<style>
+  html,body{margin:0;height:100%;background:#29c5d6;font-family:"Space Grotesk",system-ui,sans-serif;overflow:hidden}
+  canvas{display:block}
+  #panel{position:fixed;top:16px;left:16px;background:#1b1530ee;color:#fff;border:2px solid #000;border-radius:10px;padding:12px 16px;font-size:13px}
+  #hint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#1b1530ee;color:#fff;border:2px solid #000;border-radius:999px;padding:8px 16px;font-size:13px;white-space:nowrap}
+  button{font:inherit;background:#8b6cff;color:#fff;border:2px solid #000;border-radius:8px;padding:5px 10px;cursor:pointer;margin-top:6px}
+</style>
+</head>
+<body>
+<div id="panel"><b>CHOG #1462</b><br><span id="st">loading…</span><div id="traits" style="line-height:1.6;margin-top:6px"></div><button id="spin">Auto-rotate: on</button> <button id="tr">Traits: off</button></div>
+<div id="hint">Drag to orbit 360° · scroll to zoom · right-drag to pan</div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x29c5d6);
+const camera = new THREE.PerspectiveCamera(40, innerWidth/innerHeight, 0.1, 100); const az = parseFloat(new URLSearchParams(location.search).get("az") || 0) * Math.PI / 180;
+camera.position.set(Math.sin(az) * 10.5, 1.7, Math.cos(az) * 10.5);
+const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth, innerHeight); document.body.appendChild(renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.35, 0); controls.enableDamping = true; controls.autoRotate = !location.search.includes("still"); controls.autoRotateSpeed = 2.2; controls.minDistance = 3; controls.maxDistance = 20;
+document.getElementById("spin").onclick = e => { controls.autoRotate = !controls.autoRotate; e.target.textContent = "Auto-rotate: " + (controls.autoRotate ? "on" : "off"); };
+scene.add(new THREE.AmbientLight(0xffffff, 2.0));
+const sun = new THREE.DirectionalLight(0xffffff, 0.6); sun.position.set(3,6,5); scene.add(sun);
+
+const ground = new THREE.Mesh(new THREE.CircleGeometry(2.2,48), new THREE.MeshBasicMaterial({color:0x0a6f7c,transparent:true,opacity:0.55}));
+ground.rotation.x = -Math.PI/2; ground.position.y = -0.66; scene.add(ground);
+
+const TRAITS = {Background:"Deep Aqua",Base:"Origin",Skin:"Pink",Side:"Left",Body:"Yellow 143 Jersey",Mouth:"Flat",Eyes:"BTC Glass",Head:"MCGA",Accessory:"Fwog",Form:"Chog",Tier:"Uncommon",Naked:"No"};
+document.getElementById("traits").innerHTML = Object.entries(TRAITS).map(([k,v]) => `<b style="color:#9d8cff">${k}</b> ${v}`).join("<br>");
+const REPLACED = /^(smile|eye_|pupil|glint|bang_|tuft_top|pocket|nose|cheek_)/;   // base parts a trait covers
+const SKIN = {purple: 0xec6aac, spikeD: 0xd2498f, spikeL: 0xf283bd};              // Skin: Pink recolours fur + hoodie
+const baseColor = new Map();
+let parts = [], traitsOn = false;
+function applyTraits(){
+  for (const m of parts) {
+    if (m.name.startsWith("trait_")) m.visible = traitsOn; else if (REPLACED.test(m.name)) m.visible = !traitsOn;
+    const key = (m.userData.matName || "").split(".")[0];
+    if (key in SKIN) m.material.color.set(traitsOn ? new THREE.Color(SKIN[key]).convertSRGBToLinear() : baseColor.get(m));
+  }
+}
+document.getElementById("tr").onclick = e => { traitsOn = !traitsOn; applyTraits(); e.target.textContent = "Traits: " + (traitsOn ? "on" : "off"); };
+const chog = new THREE.Group(); scene.add(chog);
+new GLTFLoader().load("base.glb", gltf => {
+  const meshes = []; gltf.scene.traverse(o => o.isMesh && meshes.push(o));
+  for (const m of meshes) {
+    // cartoon look: flat toon shading + black back-face shell as the outline
+    const col = m.material.color.clone(); m.userData.matName = m.material.name; baseColor.set(m, col.clone());
+    m.material = new THREE.MeshToonMaterial({color: col});
+    if (!/^(eye|pupil|glint|cheek|smile|trait_txt|trait_mouth)/.test(m.name)) {
+      const o = new THREE.Mesh(m.geometry, new THREE.MeshBasicMaterial({color:0x0d0d0d, side:THREE.BackSide})); o.scale.setScalar(1.06); m.add(o);
+    }
+  }
+  chog.add(gltf.scene); parts = meshes; applyTraits();
+  document.getElementById("st").textContent = meshes.length + " parts loaded";
+}, undefined, e => { document.getElementById("st").textContent = "load failed: " + e.message; });
+
+addEventListener("resize", () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+(function loop(){ requestAnimationFrame(loop); chog.position.y = Math.sin(performance.now()/700)*0.04; controls.update(); renderer.render(scene, camera); })();
+</script>
+</body>
+</html>
