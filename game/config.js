@@ -10,7 +10,7 @@ export const CREDITS = [
   "No affiliation or endorsement implied.",
 ];
 // Bonk Arena room server: local wrangler dev while developing, the deployed Worker otherwise (set after deploy)
-export const ARENA_URL = ["localhost", "127.0.0.1"].includes(location.hostname) || /^(10|192\.168)\./.test(location.hostname) ? `http://${location.hostname}:8787` : "https://monadverse-arena.samsonsamuel531.workers.dev";
+export const ARENA_URL = ["localhost", "127.0.0.1"].includes(location.hostname) || /^(10|192\.168)\./.test(location.hostname) ? `http://${location.hostname}:8787` : "https://monorb-arena.samsonsamuel531.workers.dev";
 // chain for Bonk Arena stakes (ChogArena escrow): the local anvil sandbox while developing, Monad mainnet on the live site
 const LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname) || /^(10|192\.168)\./.test(location.hostname);
 export const STAKE_CHAIN = LOCAL
