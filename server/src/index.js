@@ -34,7 +34,8 @@ export default {
       const code = Array.from(crypto.getRandomValues(new Uint8Array(5)), b => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b % 32]).join("");
       return Response.json({ code }, { headers: CORS });
     }
-    if (url.pathname === "/config") return Response.json({ staking: !!(env.ARENA && env.SIGNER_KEY && env.RPC), chainId: Number(env.CHAIN_ID || 0) }, { headers: CORS });   // can this server run staked matches?
+    if (url.pathname === "/config") return Response.json({ staking: !!(env.ARENA && env.SIGNER_KEY && env.RPC), chainId: Number(env.CHAIN_ID || 0), arena: env.ARENA || null,
+      signer: env.SIGNER_KEY ? privateKeyToAccount(env.SIGNER_KEY).address : null }, { headers: CORS });   // signer = public address only (must equal ChogArena.signer())   // can this server run staked matches?
     if (["/board", "/world", "/daily"].includes(url.pathname))   // leaderboard, Elder Tree meter, today's quest
       return chronicle(env).fetch(new Request("https://x" + url.pathname)).then(r => new Response(r.body, { headers: { ...CORS, "content-type": "application/json" } }));
     const c = url.pathname.match(/^\/chog\/(\d{1,4})(\/story)?$/);

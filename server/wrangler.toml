@@ -15,6 +15,9 @@ tag = "v1"
 new_sqlite_classes = ["Room", "Chronicle"]   # SQLite-backed Durable Objects work on the Workers free plan
 
 [vars]
-# Chronicle holder checks read the real Chog Genesis contract on Monad (read-only). Staking stays off until ARENA/RPC/CHAIN_ID are set.
+# Monad mainnet: Chronicle holder checks (Chog Genesis) and ChogArena stakes. SIGNER_KEY is a Cloudflare secret. Local dev overrides all of these in .dev.vars.
 CHOG = "0xc96d31F8626c6D03Fae5dCD3d61e3FB9F4a73763"
 CHOG_RPC = "https://rpc.monad.xyz"
+ARENA = "0x6B9063773aEB1e2216bFD9335fb69F8BcbB88B48"   # ChogArena, verified on Sourcify
+RPC = "https://rpc.monad.xyz"
+CHAIN_ID = "143"

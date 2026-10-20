@@ -11,5 +11,8 @@ export const CREDITS = [
 ];
 // Bonk Arena room server: local wrangler dev while developing, the deployed Worker otherwise (set after deploy)
 export const ARENA_URL = ["localhost", "127.0.0.1"].includes(location.hostname) || /^(10|192\.168)\./.test(location.hostname) ? `http://${location.hostname}:8787` : "https://monadverse-arena.samsonsamuel531.workers.dev";
-// chain for Bonk Arena stakes (ChogArena escrow). Local anvil while developing; mainnet only after an explicit go-ahead.
-export const STAKE_CHAIN = { id: 31337, name: "Anvil (local test chain)", rpc: "http://127.0.0.1:8545", arena: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707", chog: "0x5FbDB2315678afecb367f032d93F642f64180aa3", chogToken: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9" };
+// chain for Bonk Arena stakes (ChogArena escrow): the local anvil sandbox while developing, Monad mainnet on the live site
+const LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname) || /^(10|192\.168)\./.test(location.hostname);
+export const STAKE_CHAIN = LOCAL
+  ? { id: 31337, name: "Anvil (local test chain)", rpc: "http://127.0.0.1:8545", arena: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707", chog: "0x5FbDB2315678afecb367f032d93F642f64180aa3", chogToken: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9" }
+  : { id: 143, name: "Monad", rpc: "https://rpc.monad.xyz", arena: "0x6B9063773aEB1e2216bFD9335fb69F8BcbB88B48", chog: CONTRACT, chogToken: "0x350035555E10d9AfAF1566AaebfCeD5BA6C27777" };

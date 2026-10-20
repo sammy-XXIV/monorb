@@ -95,6 +95,13 @@ contract ChogArenaTest is Test {
         arena.settle(id, alice, sign(0xB0B, id, alice));
         assertEq(chog.ownerOf(2), alice);
     }
+    function test_ownershipHandsOverOnlyByOwner() public {
+        vm.prank(eve); vm.expectRevert(ChogArena.NotOwner.selector); arena.transferOwnership(eve);
+        vm.expectRevert(ChogArena.BadAmount.selector); arena.transferOwnership(address(0));
+        arena.transferOwnership(alice); assertEq(arena.owner(), alice);
+        vm.expectRevert(ChogArena.NotOwner.selector); arena.setSigner(eve);   // old owner lost its rights
+        vm.prank(alice); arena.setSigner(eve); assertEq(arena.signer(), eve);
+    }
     function test_cannotOpenWithSomeoneElsesChog() public {
         vm.prank(eve); vm.expectRevert(); arena.open(1);
     }

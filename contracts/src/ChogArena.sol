@@ -63,6 +63,16 @@ contract ChogArena is EIP712, ReentrancyGuard {
         signer = signer_;
     }
 
+    event OwnerChanged(address owner);
+
+    /// @notice Hand the owner role (it can only rotate the signer) to another wallet.
+    function transferOwnership(address owner_) external {
+        if (msg.sender != owner) revert NotOwner();
+        if (owner_ == address(0)) revert BadAmount();
+        owner = owner_;
+        emit OwnerChanged(owner_);
+    }
+
     /// @notice Rotate the result signer (e.g. if the server key is replaced). Open and locked matches stay refundable.
     function setSigner(address signer_) external {
         if (msg.sender != owner) revert NotOwner();
