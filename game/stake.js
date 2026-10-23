@@ -65,3 +65,17 @@ export async function joinPot(from, matchId, amount) {
   if ((await chogBalance(from)) < amount) throw new Error("Not enough $CHOG in this wallet to match the pot.");
   await approveChog(from, amount); await send(from, C.arena, "0x831d49ef" + h32(matchId));
 }
+
+// ---- test faucet (testnet / local sandbox only): free test Chog and test $CHOG minted to your wallet ----
+export const hasFaucet = !!C.faucet;
+const MINT = "0x40c10f19";   // mint(address,uint256) on the test Chog (id) and test $CHOG (amount)
+export async function faucet(from, { chog = true, tokens = true } = {}, onStep = () => {}) {
+  if (!C.faucet) throw new Error("There's no faucet on this network.");
+  let id = 0;
+  if (chog) for (let i = 0; i < 8 && !id; i++) {   // random free Chog id (traits come from the id); an id that already exists reverts, so pick another
+    const pick = 1 + Math.floor(Math.random() * 1969); onStep(`Minting test Chog #${pick}… confirm in your wallet`);
+    try { await send(from, C.chog, MINT + addr(from) + h32(pick)); id = pick; } catch (e) { if (e && e.code === 4001) throw e; if (i === 7) throw e; }
+  }
+  if (tokens) { onStep("Minting 1,000 test $CHOG… confirm in your wallet"); await send(from, C.chogToken, MINT + addr(from) + h32(1000n * 10n ** 18n)); }
+  return id;
+}

@@ -1,37 +1,63 @@
 # Monorb: relive the Monadverse story as your own Chog
 
-A browser 3D game built for **Chogathon 2026**. You play the Monadverse story (Molandak vs Mongrod) as **your own Chog Genesis NFT**. Its traits build your 3D character and change how you play. You can also fight other Chogs live in **Bonk Arena**. Every Chog keeps a **Chronicle**, a history that stays with the NFT when it changes hands.
+A 3D browser game built for **Chogathon 2026**. You play the Monadverse story (Molandak vs Mongrod) as a **Chog Genesis** Chog. Its traits build your 3D character and change how you play. You can fight other Chogs live in **Bonk Arena**, and every Chog keeps a **Chronicle**: a history tied to the Chog itself, which stays with it when it changes hands.
 
-**Play:** https://monorb.pages.dev (desktop or phone in landscape, no install)
+**Play:** https://monorb.pages.dev/game/ (desktop, or a phone held landscape; no install, no login)
 
 ## For judges: how to test (about 5 minutes)
 
-1. Open the link. Click **Connect wallet** if you hold a Chog Genesis. Your wallet is only read, with no signature and no transaction. If you don't hold one, click **or play as guest**, or open *Guest: pick any token #* and pick any Chog from 1 to 1969.
-2. Watch the plain Chog **transform** into the chosen token's traits (skin, outfit, hat, eyes, aura).
-3. **▶ Story, then Chapter 1 (The Genesis):** talk to the Doctor (F, or the Talk button), collect the 3 Time Shards (swamp raft, graveyard, ruins), then outrun Mongrod's war beast to the portal. **Chapter 2 (Back to the Past)** follows: win over Moyaki (spices), Mouch (a ring race) and Salmonad (his map up the falls).
-4. **⚔ Bonk Arena:** creates a room. Copy the invite link into a second browser window or a phone. The host presses Start. Spin-attack (K, click, or the Spin button) to knock the other Chog off the shrinking platform. The first to win 3 rounds takes the match.
-5. **📜 Chronicle, 🏆 Leaderboard, 🔥 Daily quest, 🌳 Elder Tree meter:** these are only written for wallets that hold the Chog they play as, and are verified on-chain. Guests can play everything, but their results aren't recorded.
+1. **Open the link.** A random Chog from the 1,969 in the collection is summoned straight away: it charges up, spins, and bursts in as its traits (skin, body, head, eyes, aura) pop on one by one. **Spin another** rolls a new one. On a phone, tap once to go fullscreen.
+2. **Story:** all **10 chapters** of Monadverse Season 1, each with an illustrated chapter card, in-engine cutscenes and a playable part.
+   - **Chapters 1–2** (The Genesis, Back to the Past) are free-roam platforming and exploration.
+   - **Chapters 3–10** follow the lore:
+     - the pub story with choices;
+     - a stealth run through Mongrod's fortress (visor, glasses and laser eyes see the patrol cones);
+     - training, then a duel with the Rilla chief;
+     - the jungle trap (tap to cut the ropes);
+     - the ambush by Future Mongrod;
+     - the cave of stone guardians (Skull, Radioactive and 1:1 Chogs find a hidden passage);
+     - the finale, whose ending depends on your choices and traits.
+   - Chapters unlock in order, and progress is saved per Chog. Fights use your Chog's perks and get gentler each time you lose.
+3. **Bonk Arena:** creates a room.
+   - **Fight a bot** for an instant solo match against an AI Chog with its own random traits.
+   - Or **Copy invite**, open the link in a second browser or on a phone, and the host presses **Start the fight**.
+   - Spin-attack (K, click, or the Spin button) to knock the other Chog off the shrinking platform. The first to win 3 rounds takes the match.
+4. **Chronicle:** shows the current Chog's traits, exactly what each one does in the story and the arena, and its history. **Board** is the champions leaderboard. The title screen shows today's **daily quest** and the community **Elder Tree** meter.
 
-Controls:
-- **Desktop:** WASD to move, Shift to run, Space to jump (press it again in the air for a double jump), K or click to spin, drag to look.
-- **Phone:** joystick, plus Jump, Spin and Talk buttons, and drag to look.
+**Controls**
+- **Desktop:** WASD to move, Shift to run, Space to jump (press again in the air for a double jump), K or click to spin, L for your skill, F to talk and advance dialogue, drag to look.
+- **Phone:** a joystick (push to the rim to run), plus Jump, Spin, Talk and Skill buttons, and drag to look.
 
-## Why the NFT is essential
+## Why the Chog matters
 
-- **Looks:** each trait (skin, body, head, eyes, aura, tier) is applied to a 3D Chog model.
-- **Story stats:** your Tier sets your hearts, and an Aura gives you one revive.
-- **Arena fighting style:** traits give up to 2 perks. Laser eyes reach further, crowns hit harder, Spartan or Russian hats make you heavier, an aura shield blocks the first hit, and Rare-or-better Chogs get an air jump. The server reads the traits from the token itself, so a client can't fake them.
-- **Chronicle:** arena wins, knockouts, daily-quest streaks and story chapters are written to that token's history. A new owner inherits it.
+- **Looks.** Every trait (skin, body, head, eyes, aura, tier) is applied to the 3D Chog model.
+- **Story stats.**
+  - Tier sets your hearts: Common 3, Uncommon 4, Rare 5, Epic 6, Legendary 7.
+  - Any aura other than Clean gives one revive.
+  - Your eyes or headwear pick your chapter 5 skill: Beam, Dash or Guard.
+  - Eyes and the rare forms change what you see and where you can go in chapters 3–10.
+- **Arena fighting style.** Traits give up to 2 perks, and none is worth more than 20%:
+  - Air Jump (Rare and up)
+  - Royal Power (crown or wizard hat)
+  - Heavy (spartan, russian or plumber head)
+  - Laser Bonk (laser eyes)
+  - Target Lock (visor, VR or glasses)
+  - Aura Shield (any aura)
+  - Quick (cap, beanie or bucket hat)
+  - Floaty (Duck Float body)
+- **Chronicle.** Arena wins, knockouts, daily-quest streaks and finished chapters are stored against the token ID, not a wallet. When a Chog is sold or traded, the new owner inherits its whole history.
+
+**About this public build:** it runs in guest mode, so anyone can try any Chog without a wallet. Holder verification (wallet signatures checked against `ownerOf` on Monad) and on-chain stakes are implemented in `server/` and `contracts/`, but switched off in the UI. Guest games are not written into a Chog's Chronicle.
 
 ## Architecture
 
 | Part | Where | Notes |
 |---|---|---|
-| Game | `game/` | three.js and Rapier (CDN import map), with no build step. Chapters in `game/chapters/`, engine in `game/engine/`. |
-| Characters | `molandak/`, `moyaki/`, `salmonad/`, `mouch/`, `mongrod/` | Built in code with three.js. The Chog model is generated by Blender scripts (`face/`, `hair/`, `body/`). |
-| Arena fight | `game/arena_sim.js` | Pure and deterministic. It runs **on the server** (clients only send inputs), so nobody can fake moves or wins. |
-| Rooms and Chronicle | `server/` | A Cloudflare Worker with Durable Objects: rooms, holder verification (`ownerOf` on Monad), Chronicle, leaderboard, daily quest, and the Elder Tree meter. |
-| Stakes | `contracts/ChogArena.sol` | Winner-takes-all escrow: Chog for Chog, or a **$CHOG pot**. The server signs the result (EIP-712), and each player can refund their own stake if the server never signs. Live on Monad mainnet at [`0x6B9063773aEB1e2216bFD9335fb69F8BcbB88B48`](https://sourcify.dev/server/repo-ui/143/0x6B9063773aEB1e2216bFD9335fb69F8BcbB88B48) (source verified on Sourcify). |
+| Game | `game/` | three.js and Rapier via a CDN import map, with no build step. Chapters live in `game/chapters/` (story chapters 3–10 in `game/chapters/story/`), the engine in `game/engine/`. |
+| Characters | `molandak/`, `moyaki/`, `salmonad/`, `mouch/`, `mongrod/`, `rilla/` | Built in code with three.js. The Chog model (`face/`, `hair/`, `body/`) is generated by Blender scripts and rigged. |
+| Arena fight | `game/arena_sim.js` | A pure, deterministic simulation. In PvP it runs **on the server** (clients only send inputs), so nobody can fake moves or wins. The same sim runs locally for story fights and **Fight a bot** (`game/engine/fight.js`, `game/engine/bots.js`). |
+| Rooms and Chronicle | `server/` | A Cloudflare Worker with Durable Objects: arena rooms, holder verification, Chronicle, leaderboard, daily quest and the Elder Tree meter. |
+| Stakes | `contracts/ChogArena.sol` | Winner-takes-all escrow: Chog for Chog, or a **$CHOG pot**. The server signs the result (EIP-712), and each player can refund their own stake if the server never signs. Deployed on Monad mainnet at [`0x6B9063773aEB1e2216bFD9335fb69F8BcbB88B48`](https://sourcify.dev/server/repo-ui/143/0x6B9063773aEB1e2216bFD9335fb69F8BcbB88B48) (source verified on Sourcify), with a testnet copy deployable via `tools/deploy_testnet.sh`. |
 
 ## Run locally
 
@@ -41,8 +67,8 @@ cd server && npm i && npx wrangler@3 dev --port 8787   # rooms + Chronicle (crea
 cd contracts && forge install foundry-rs/forge-std OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-git && forge test
 ```
 
-Tests:
-- Game logic: `cd game && node --test`.
+**Tests**
+- Game logic: `cd game && node --test` (arena sim, bots, stealth, chapter flow, saves).
 - Server logic: `cd server && node --test test/chronicle.test.js test/daily.test.js`.
 - In-browser self-tests: `game/index.html?selftest` and `?selftest&ch=2`.
 

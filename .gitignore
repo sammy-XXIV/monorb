@@ -1,5 +1,6 @@
 # build + deps
 dist/
+demo/
 **/node_modules/
 server/.wrangler/
 contracts/out/

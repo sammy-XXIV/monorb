@@ -15,9 +15,10 @@ tag = "v1"
 new_sqlite_classes = ["Room", "Chronicle"]   # SQLite-backed Durable Objects work on the Workers free plan
 
 [vars]
-# Monad mainnet: Chronicle holder checks (Chog Genesis) and ChogArena stakes. SIGNER_KEY is a Cloudflare secret. Local dev overrides all of these in .dev.vars.
-CHOG = "0xc96d31F8626c6D03Fae5dCD3d61e3FB9F4a73763"
-CHOG_RPC = "https://rpc.monad.xyz"
-ARENA = "0x6B9063773aEB1e2216bFD9335fb69F8BcbB88B48"   # ChogArena, verified on Sourcify
-RPC = "https://rpc.monad.xyz"
-CHAIN_ID = "143"
+# Monad TESTNET (10143): test Chog + test $CHOG with a public faucet, ChogArena below. SIGNER_KEY is a Cloudflare secret. Local dev overrides all of these in .dev.vars.
+# Mainnet (143) for reference: CHOG 0xc96d31F8626c6D03Fae5dCD3d61e3FB9F4a73763, ARENA 0x6B9063773aEB1e2216bFD9335fb69F8BcbB88B48, RPC https://rpc.monad.xyz
+CHOG = "0xefB2979b20a8998D5d98285bE5508dd7bf31D354"
+CHOG_RPC = "https://testnet-rpc.monad.xyz"
+ARENA = "0x8CECe063eb9ff3da4d277De8a44fe32a65ad3E3c"
+RPC = "https://testnet-rpc.monad.xyz"
+CHAIN_ID = "10143"

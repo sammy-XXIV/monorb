@@ -5,6 +5,8 @@ import { buildArena } from "./chapters/arena.js";
 import { FOOT_Y } from "./chog.js";
 import * as stakeApi from "./stake.js";
 import { sign, holderMessage, getJSON } from "./chronicle.js";
+import { createFight } from "./engine/fight.js";
+import { arenaPerks } from "./arena_sim.js";
 
 const $ = id => document.getElementById(id);
 const DELAY = 0.1;   // render 100 ms in the past, between two snapshots: smooth even with jittery packets
@@ -33,12 +35,13 @@ export function createArenaMode({ scene, camera, gfx, chog, traitsOf, token, hol
     for (const id of [...chogs.keys()]) if (!lobby.find(p => p.id === id)) dropChog(id);
     lobby.forEach(async p => { const v = await ensureChog(p.id, p.token); if (v.c && v.tok !== p.token) { v.tok = p.token; v.c.applyTraits(traitsOf(p.token)); } });
     stake = m.stake && m.stake.matchId !== paid ? m.stake : null; renderStake();
-    $("arPlayers").innerHTML = lobby.map(p => `<div>${p.id === host ? "👑 " : ""}<b>${p.name}</b>${p.id === me ? " (you)" : ""} · ${p.wins} wins${p.wallet ? " · 🔒 staked" : ""}${p.verified ? " · 📜 holder" : " · guest"}`
+    $("arPlayers").innerHTML = lobby.map(p => `<div><b>${p.name}</b>${p.id === me ? " (you)" : ""}${p.id === host ? " · host" : ""} · ${p.wins} wins`
       + `<div class="muted" style="font-size:12px">${(p.perks && p.perks.tags.length ? p.perks.tags : ["No special moves"]).join(" · ")}</div></div>`).join("");
     const idle = m.phase === "lobby" || m.phase === "over";
     $("arStart").style.display = idle && me === host ? "" : "none"; $("arStart").disabled = lobby.length < 2;
     $("arStart").textContent = lobby.length < 2 ? "Waiting for a challenger…" : m.phase === "over" ? "Rematch" : "Start the fight";
     $("arWait").style.display = idle && me !== host ? "" : "none";
+    $("arBot").style.display = idle && lobby.length < 2 ? "" : "none";
     if (m.phase === "over" && m.winner) $("arResult").textContent = `${nameOf(m.winner)} wins the match!`;
     document.getElementById("arenaLobby").classList.toggle("on", idle);
   }
@@ -68,8 +71,8 @@ export function createArenaMode({ scene, camera, gfx, chog, traitsOf, token, hol
     const link = `${location.origin}${location.pathname}?room=${code}`;
     $("arCodeLine").textContent = `Room ${code}`; $("arLink").value = link; { const q = new URLSearchParams(location.search); q.set("room", code); history.replaceState(null, "", "?" + q); }
     conn = joinRoom(code, { name: `Chog #${token}`, token }, onMsg);
-    getJSON("/config").then(c => { if (!c.staking) { $("arStake").style.display = "none"; $("arDaily").insertAdjacentHTML("afterend", `<p class="muted" style="font-size:12px">💰 Chog and $CHOG stakes go live on Monad mainnet soon — fights here are just for glory (and your Chronicle).</p>`); } }).catch(() => {});
-    getJSON("/daily").then(q => { $("arDaily").innerHTML = `🔥 Today's quest: <b>${q.text}</b>${holder ? "" : " — holders only (connect your wallet)"}`; }).catch(() => {});
+    getJSON("/config").then(c => { if (!c.staking) { $("arStake").style.display = "none"; $("arDaily").insertAdjacentHTML("afterend", `<p class="muted" style="font-size:12px">Chog and $CHOG stakes go live on Monad mainnet soon — fights here are just for glory (and your Chronicle).</p>`); } }).catch(() => {});
+    getJSON("/daily").then(q => { $("arDaily").innerHTML = `Today's quest: <b>${q.text}</b>`; }).catch(() => {});
     $("arenaLobby").classList.add("on"); $("arHud").classList.add("on");
     rig.pinned = null; rig.yaw = Math.PI; rig.pitch = 0.5; rig.dist = 22;
   }
@@ -78,7 +81,8 @@ export function createArenaMode({ scene, camera, gfx, chog, traitsOf, token, hol
   const stakeMsg = t => { $("arStakeInfo").textContent = t; };
   function renderStake() {
     const show = (id, on) => { $(id).style.display = on ? "" : "none"; };
-    ["arOpen", "arPotRow", "arMatch", "arClaim", "arCancel", "arRefund"].forEach(id => show(id, false));
+    ["arOpen", "arPotRow", "arMatch", "arClaim", "arCancel", "arRefund", "arFaucet"].forEach(id => show(id, false));
+    if (stakeApi.hasFaucet && !busy) show("arFaucet", true);
     if (busy) return;
     if (!stake) { show("arOpen", true); show("arPotRow", true); return stakeMsg((note ? note + " " : "") + `Optional stake, winner takes all: escrow Chog #${token} (winner gets both Chogs), or a $CHOG pot (holders only).`); }
     const S = stake.state, isPot = stake.pot && stake.pot !== "0", potTxt = isPot ? `${stakeApi.fromWei(stake.pot)} $CHOG each` : "";
@@ -97,6 +101,7 @@ export function createArenaMode({ scene, camera, gfx, chog, traitsOf, token, hol
     busy = false; renderStake();
   }
   const bind = async matchId => { const sig = await stakeApi.signBind(wallet, stakeApi.bindMessage(code, matchId, me, wallet)); conn.send({ t: "stake", matchId, address: wallet, sig }); };
+  $("arFaucet").onclick = () => act("Minting test $CHOG", async () => { await stakeApi.faucet(wallet, { chog: false, tokens: true }, stakeMsg); note = "You now have 1,000 test $CHOG."; });
   $("arOpen").onclick = () => act("Escrowing your Chog", async () => { const id = await stakeApi.openMatch(wallet, token); await bind(id); });
   $("arMatch").onclick = () => act("Matching the stake", async () => {
     if (stake.pot && stake.pot !== "0") await stakeApi.joinPot(wallet, stake.matchId, BigInt(stake.pot)); else await stakeApi.joinMatch(wallet, stake.matchId, token);
@@ -108,6 +113,26 @@ export function createArenaMode({ scene, camera, gfx, chog, traitsOf, token, hol
 
   function leave() { conn && conn.close(); onLeave(); }
   $("arStart").onclick = () => conn && conn.send({ t: "start" });
+
+  // solo practice: the same arena sim run locally against a bot Chog
+  let bot = null, fight = null;
+  $("arBot").onclick = async () => {
+    $("arBot").disabled = true;
+    const botTok = 1 + Math.floor(Math.random() * 1969), bt = traitsOf(botTok);
+    if (!bot) { const m = await import(`./chog.js?p=bot-${Date.now()}`); bot = await m.loadChog(".."); scene.add(bot.root); }
+    bot.applyTraits(bt); bot.root.visible = true;
+    fight = createFight({ stage: { origin: { x: 0, y: 0, z: 0 }, group: arena.root, setRadius: arena.setRadius }, rig, chog, sfx, dist: 22,
+      opts: { winsToWin: 3 }, player: { perks: arenaPerks(traitsOf(token)) },
+      actors: [{ id: "bot", model: bot.root, name: `Chog #${botTok}`, perks: { ...arenaPerks(bt), power: (arenaPerks(bt).power ?? 1) * 0.6 }, team: "foe", baseY: -FOOT_Y, ai: { react: 1.0, aggr: 0.35, dodge: 0 } }] });
+    $("arResult").textContent = ""; $("arTags").style.display = "none"; $("arenaLobby").classList.remove("on"); $("arBot").disabled = false;
+  };
+  function practiceFrame(dt, input, keys) {
+    const r = fight.frame(dt, input, keys), p = fight.sim.players.bot;
+    bot.update(dt, Math.hypot(p.vx, p.vz), p.y > 0.2 || !p.alive);
+    arena.update(clock); gfx.render(allParts().concat(bot.parts));
+    if (r.done) { fight.dispose(); fight = null; bot.root.visible = false; $("arHud").classList.add("on"); $("arTags").style.display = "";
+      $("arResult").textContent = r.won ? "You win the match!" : "The bot wins the match."; $("arBot").textContent = "Rematch the bot"; $("arenaLobby").classList.add("on"); }
+  }
   $("arCopy").onclick = async () => { try { await navigator.clipboard.writeText($("arLink").value); $("arCopy").textContent = "Copied!"; } catch { $("arLink").select(); } };
   $("arLeave").onclick = leave;
 
@@ -125,6 +150,7 @@ export function createArenaMode({ scene, camera, gfx, chog, traitsOf, token, hol
   const tmp = new THREE.Vector3();
   function frame(dt, input, keys) {
     clock += dt; if (!arena) return;
+    if (fight) return practiceFrame(dt, input, keys);
     if (banner.t > 0 && (banner.t -= dt) <= 0) $("arBanner").classList.remove("on");
     // inputs: camera-relative stick -> world direction (the same mapping the solo game uses)
     const yaw = rig.moveYaw(), sn = Math.sin(yaw), cs = Math.cos(yaw);

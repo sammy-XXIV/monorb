@@ -42,7 +42,7 @@ export async function run(D) {
     log(F().phase === "gather", "everyone in -> gather", F().phase);
     // campfire -> outro cutscene -> chapter complete
     at(0, 5); D.sim({}, 0.2); log(g().mode === "cine", "campfire starts the outro cutscene", g().mode);
-    if (g().cine) g().cine.skip(); await new Promise(r => setTimeout(r, 400));
+    if (g().cine) g().cine.skip(); for (let i = 0; i < 100 && g().mode !== "result"; i++) await new Promise(r => setTimeout(r, 100));   // the frame loop ends the cutscene on its next tick
     log(F().phase === "complete" && g().mode === "result", "chapter 2 complete", `phase ${F().phase} mode ${g().mode}`);
   } catch (e) { log(false, "EXCEPTION", e.stack || e); }
   log(errs.length === 0, "no runtime errors", errs.join(" | "));

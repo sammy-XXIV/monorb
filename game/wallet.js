@@ -1,8 +1,8 @@
 // Read-only wallet: get the address from the injected wallet (no signing, no chain switch),
-// then find which Chog Genesis tokens it owns with ONE Multicall3 call of ownerOf(1..1969) on Monad.
-import { CONTRACT } from "./config.js";
+// then find which Chog tokens it owns with ONE Multicall3 call of ownerOf(1..1969) on the configured chain.
+import { NFT_READ } from "./config.js";
 
-const RPC = "https://rpc.monad.xyz", MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11", SUPPLY = 1969;
+const RPC = NFT_READ.rpc, MULTICALL3 = NFT_READ.multicall, CONTRACT = NFT_READ.chog, SUPPLY = 1969;
 const hex32 = n => n.toString(16).padStart(64, "0");
 
 export function hasWallet() { return typeof window !== "undefined" && !!window.ethereum; }

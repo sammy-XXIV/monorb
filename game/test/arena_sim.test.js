@@ -103,3 +103,55 @@ test("round wins and flawless matches are counted", () => {
   for (let r = 0; r < WINS_TO_WIN; r++) { if (s.phase !== "fight") run(s, {}, 6); s.players.a.x = R0 + 3; s.players.a.z = 0; run(s, {}, 2.5); }
   assert.equal(s.players.b.roundsWon, 3); assert.equal(s.players.b.falls, 0); assert.equal(s.players.a.roundsWon, 0);
 });
+
+// ---- story fights: teams (allies never hit each other) and a configurable win count ----
+test("winsToWin option ends the match after that many round wins", () => {
+  const s = createArena(1, { winsToWin: 1 }); addPlayer(s, "a"); addPlayer(s, "b"); startMatch(s); run(s, {}, 3.1);
+  s.players.a.x = R0 + 3; s.players.a.z = 0; run(s, {}, 2.5); assert.equal(s.phase, "over"); assert.equal(s.winner, "b");
+});
+test("teammates don't knock each other; the round ends when one team is left", () => {
+  const s = createArena(1); addPlayer(s, "p", { team: "hero" }); addPlayer(s, "m", { team: "hero" }); addPlayer(s, "e", { team: "foe" }); startMatch(s); run(s, {}, 3.1);
+  const { p, m, e } = s.players; p.x = 0; p.z = 0; m.x = 2; m.z = 0; e.x = -12; e.z = 0;
+  step(s, { p: { spin: true } }, 1 / 30); run(s, {}, 0.4); assert.ok(Math.abs(m.x - 2) < 0.5, "ally not pushed");
+  e.x = R0 + 3; e.z = 0; run(s, {}, 2.5);
+  assert.equal(s.phase === "roundover" || s.phase === "over", true); assert.equal(s.players.p.wins, 1); assert.equal(s.players.m.wins, 1); assert.equal(s.players.e.wins, 0);
+});
+test("a dead player's team keeps fighting while a teammate stands", () => {
+  const s = createArena(1); addPlayer(s, "p", { team: "hero" }); addPlayer(s, "m", { team: "hero" }); addPlayer(s, "e", { team: "foe" }); startMatch(s); run(s, {}, 3.1);
+  s.players.p.x = R0 + 3; s.players.p.z = 0; run(s, {}, 2.5); assert.equal(s.phase, "fight", "round goes on: Mouch is still up");
+});
+test("humanId: when the human falls their team loses the round even if allies are alive", () => {
+  const s = createArena(1, { winsToWin: 2, humanId: "me" });
+  addPlayer(s, "me", { team: "hero" }); addPlayer(s, "ally", { team: "hero" }); addPlayer(s, "foe", { team: "foe" }); startMatch(s); run(s, {}, 3.1);
+  s.players.me.x = R0 + 5; run(s, {}, 1);
+  assert.equal(s.phase, "roundover"); assert.equal(s.lastRoundWinner, "foe"); assert.equal(s.players.foe.wins, 1);
+});
+test("a big body (perks.body) holds a normal one further away and is still hittable at that distance", () => {
+  const s = createArena(1); addPlayer(s, "a"); addPlayer(s, "big", { perks: { body: 2.6 } }); startMatch(s); run(s, {}, 3.1);
+  const a = s.players.a, b = s.players.big; a.x = 0; a.z = 0; b.x = 1; b.z = 0; run(s, {}, 0.1);
+  assert.ok(Math.hypot(b.x - a.x, b.z - a.z) >= 3.5, "pushed apart by 1 + 2.6");
+  step(s, { a: { spin: true } }, 1 / 30); assert.ok(b.kx !== 0 || b.kz !== 0, "spin lands on the big body");
+});
+const duelP = (aPerks, bPerks) => { const s = createArena(1, { humanId: "me" }); addPlayer(s, "me", { team: "hero", perks: aPerks }); addPlayer(s, "b", { team: "foe", perks: bPerks }); startMatch(s); run(s, {}, 3.1);
+  Object.assign(s.players.me, { x: 0, z: 0, heading: Math.PI / 2 }); Object.assign(s.players.b, { x: 6, z: 0, heading: -Math.PI / 2 }); return s; };
+test("beam hits a foe in a line, not one off to the side", () => {
+  let s = duelP({ ability: "beam" }, {}); step(s, { me: { skill: true } }, 1 / 30); assert.ok(s.players.b.kx > 5, "knocked along the line");
+  s = duelP({ ability: "beam" }, {}); s.players.b.z = 5; step(s, { me: { skill: true } }, 1 / 30); assert.equal(s.players.b.kx, 0);
+});
+test("dash lunges forward and bonks what it hits; guard soaks a spin", () => {
+  let s = duelP({ ability: "dash" }, {}); run(s, { me: { skill: true } }, 0.5); assert.ok(s.players.b.x > 6.5 || !s.players.b.alive || s.players.b.kx !== 0, "dash connected");
+  s = duelP({ ability: "guard" }, {}); step(s, { me: { skill: true } }, 1 / 30); s.players.b.x = 2; step(s, { b: { spin: true } }, 1 / 30);
+  const guarded = Math.abs(s.players.me.kx); s = duelP({}, {}); s.players.b.x = 2; step(s, { b: { spin: true } }, 1 / 30); assert.ok(guarded < Math.abs(s.players.me.kx) * 0.3, "guard cuts the knock");
+});
+test("boss slam: winds up, hurls a grounded foe, misses a jumping one, then the boss is stunned and takes more knock", () => {
+  const slam = { every: 5, wind: 1, r: 7.5, k: 1.1, recover: 1.7 };
+  let s = duelP({}, { slam }); run(s, {}, 2.1); s.players.b.x = 4; step(s, { b: { slam: true } }, 1 / 30); assert.ok(s.players.b.slamT > 0);
+  run(s, {}, 1.1); assert.ok(Math.hypot(s.players.me.kx, s.players.me.kz) > 10, "grounded foe hurled"); assert.ok(s.players.b.stunT > 0, "boss recovering");
+  s = duelP({}, { slam }); run(s, {}, 2.1); s.players.b.x = 4; step(s, { b: { slam: true } }, 1 / 30); run(s, {}, 0.1); step(s, { me: { jump: true } }, 1 / 30); run(s, {}, 0.8);
+  assert.equal(Math.hypot(s.players.me.kx, s.players.me.kz) < 1, true, "jumper dodged");
+});
+test("revive perk: the first fall puts you back on the platform, the second one counts", () => {
+  const s = createArena(1, { humanId: "me" }); addPlayer(s, "me", { team: "hero", perks: { revive: true } }); addPlayer(s, "foe", { team: "foe" }); startMatch(s); run(s, {}, 3.1);
+  Object.assign(s.players.me, { x: 30, y: -13 }); step(s, {}, 1 / 30); assert.equal(s.players.me.alive, true); assert.equal(s.phase, "fight"); assert.ok(Math.hypot(s.players.me.x, s.players.me.z) < 1);
+  Object.assign(s.players.me, { x: 30, y: -13 }); step(s, {}, 1 / 30); assert.equal(s.players.me.alive, false);
+});

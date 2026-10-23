@@ -9,7 +9,8 @@ import { KIT, spawn } from "./engine/assets.js";
 import { loadChog, FOOT_Y } from "./chog.js";
 import { rulesFor } from "./rules.js";
 import { saveKey, loadSave, writeSave } from "./save.js";
-import { TITLE, CONTRACT, CREDITS, GUEST_TOKEN } from "./config.js";
+import { TITLE, CONTRACT, CREDITS, GUEST_TOKEN, STAKE_CHAIN } from "./config.js";
+import * as stakeApi from "./stake.js";
 import { createFlow } from "./chapters/ch1flow.js";
 import { hasWallet, connect as walletConnect, ownedChogs } from "./wallet.js";
 import { buildCh1 } from "./chapters/ch1level.js";
@@ -17,7 +18,8 @@ import { buildCh2 } from "./chapters/ch2level.js";
 import { createFlow2 } from "./chapters/ch2flow.js";
 import { createCutscene } from "./engine/cutscene.js";
 import { createArenaMode } from "./arena_mode.js";
-import { arenaPerks } from "./arena_sim.js";
+import { arenaPerks, abilityKind } from "./arena_sim.js";
+import { createFight } from "./engine/fight.js";
 import { getChronicle, chronicleHtml, writeChapter, getJSON, dailyHtml, worldHtml, boardHtml } from "./chronicle.js";
 
 const $ = id => document.getElementById(id);
@@ -27,11 +29,12 @@ const Q = new URLSearchParams(location.search);
 
 const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(50, 1, 0.1, 600);
 const gfx = createGfx($("view"), scene, camera);
-window.DBG = { gfx, scene, camera, THREE, get: () => ({ chap, cine, phys, player, mode, dialogue, keys: [...keys], level, flow, hits, rig }), sim: (i, s) => sim(i, s), talk: () => { if (talkTarget()) talk(); while (dialogue) advance(); }, go: n => goChapter(n), begin: () => begin(), fail: (t) => fail(t) };   // probing from devtools
+window.DBG = { gfx, scene, camera, THREE, story: () => storyApi, signal: k => signalKey(k), get: () => ({ chap, cine, roaming, fightRun, phys, player, mode, dialogue, keys: [...keys], level, flow, hits, rig }), sim: (i, s) => sim(i, s), talk: () => { if (talkTarget()) talk(); while (dialogue) advance(); }, go: n => goChapter(n), begin: () => begin(), fail: (t) => fail(t) };   // probing from devtools
 const titleLight = new THREE.HemisphereLight(0xffffff, 0x8877aa, 2.2); scene.add(titleLight);
 const titleSun = new THREE.DirectionalLight(0xffffff, 1.2); titleSun.position.set(4, 10, 8); scene.add(titleSun);
 
 let TRAITS = {}, chog, token = +(Q.get("token") || GUEST_TOKEN), rules = rulesFor({}), mode = "title", bg = 0x5b6cf7;
+let storyBlock = false, roaming = false, storyObj = "", storyPips = null, fightRun = null, mashRun = null, nextChap = 2, tapQueue = 0;
 let holder = null, chap = 1, cine = null, phys, level, player, rig, flow, hits = 0, reviveUsed = false, wispsGot = 0, dialogue = null;
 const keys = new Set(), pressed = new Set();
 addEventListener("keydown", e => { if (!keys.has(e.code)) pressed.add(e.code); keys.add(e.code); if (["Space", "ArrowUp", "ArrowDown"].includes(e.code)) e.preventDefault(); });
@@ -55,6 +58,7 @@ if (TOUCH) {
   el.addEventListener("pointerdown", e => { stick.id = e.pointerId; el.setPointerCapture(e.pointerId); move(e); });
   el.addEventListener("pointermove", move); el.addEventListener("pointerup", release); el.addEventListener("pointercancel", release);
 }
+if (TOUCH) addEventListener("pointerdown", () => document.documentElement.requestFullscreen?.().catch(() => {}), { once: true });
 let clickSpin = false;
 $("view").addEventListener("pointerup", () => setTimeout(() => { if (rig && rig.lastDragMoved < 6) clickSpin = true; }, 0));
 
@@ -75,8 +79,8 @@ spawn(`${KIT.nature}tree_oak.glb`).then(t => {
 const C_ = (a, b, k) => new THREE.Color(a).lerp(new THREE.Color(b), k);
 function growElder(pct) {
   elder.pct = pct; const k = Math.max(0, Math.min(1, pct / 100)), green = Math.min(1, k * 2), gold = Math.max(0, k * 2 - 1);
-  for (const m of elder.leaves) { m.material.color.copy(C_(0x2a2230, 0x5fae4a, green).lerp(new THREE.Color(0xffc93a), gold)); m.scale.setScalar(0.45 + 0.55 * Math.min(1, k * 1.5)); }
-  for (const m of elder.bark) m.material.color.copy(C_(0x2a1f24, 0x8a5a3a, Math.min(1, k * 3)));
+  for (const m of elder.leaves) { m.material.color.copy(C_(0x3d2820, 0x5fae4a, green).lerp(new THREE.Color(0xffc93a), gold)); m.scale.setScalar(0.45 + 0.55 * Math.min(1, k * 1.5)); }
+  for (const m of elder.bark) m.material.color.copy(C_(0x5a3a28, 0x8a5a3a, Math.min(1, k * 3)));
   if (elder.embers) { elder.embers.pts.material.opacity = 1 - k; elder.glow.pts.material.opacity = k; }
 }
 function showInfo() {
@@ -86,17 +90,17 @@ function showInfo() {
   $("perks").innerHTML = `<b>Story:</b> ${rules.maxHits} hearts${rules.revive ? " · Aura revive" : ""}${rules.secret ? " · secret paths" : ""}<br><b>Arena:</b> ${ap.length ? ap.join(" · ") : "no special moves (base stats)"}`;
   const s = loadSave(localStorage, saveKey(CONTRACT, token));
   $("prog").textContent = `#${token}: ${s.done.length}/10 chapters` + (s.badges.length ? ` · badges: ${s.badges.join(", ")}` : "");
-  const tok = token; $("chron").innerHTML = "📜 Reading this Chog's Chronicle…";
+  const tok = token; $("chron").innerHTML = "Reading this Chog's Chronicle…";
   Promise.all([getChronicle(tok), getJSON("/daily"), getJSON("/world")]).then(([r, q, w]) => { if (tok !== token) return;
-    $("chron").innerHTML = chronicleHtml(r) + (holder ? "" : `<div class="muted" style="font-size:12px">Connect the holder's wallet to write your games into it.</div>`);
+    $("chron").innerHTML = chronicleHtml(r);
     $("daily").innerHTML = dailyHtml(q, r); $("world").innerHTML = worldHtml(w); growElder(Q.has("tree") ? +Q.get("tree") : w.percent); })
-    .catch(() => { $("chron").textContent = "📜 Chronicle unavailable right now."; });
+    .catch(() => { $("chron").textContent = "Chronicle unavailable right now."; });
 }
 // a finished chapter goes into the Chog's Chronicle (holder signs once); guests are told how to make it count
 async function chronicleChapter(n) {
   if (!holder) { $("resText").insertAdjacentHTML("beforeend", `<br><span class="muted">Played as a guest — connect the holder's wallet to write this into Chog #${token}'s Chronicle.</span>`); return; }
   $("resText").insertAdjacentHTML("beforeend", `<br><span class="muted" id="chronNote">Sign in your wallet to write chapter ${n} into Chog #${token}'s Chronicle…</span>`);
-  try { await writeChapter(token, n, holder); $("chronNote").textContent = `📜 Written into Chog #${token}'s Chronicle.`; }
+  try { await writeChapter(token, n, holder); $("chronNote").textContent = `Written into Chog #${token}'s Chronicle.`; }
   catch (e) { $("chronNote").textContent = `Chronicle not updated: ${e.message || e}`; }
 }
 
@@ -147,7 +151,7 @@ function tickTransform(dt, sx) {
     if (TF.t > 0.15 + TF.parts.length * 0.14 + 0.7) {
       TF.phase = "done"; TF.spin = 0; r.position.y = -FOOT_Y;
       const t = TRAITS[token] || {}; $("nameCard").textContent = `CHOG #${token}` + (t.Tier ? ` · ${t.Tier}` : ""); $("nameCard").style.transform = "translateX(-50%) translateY(0)";
-      $("playRow").style.display = ""; $("arenaSub").textContent = Q.get("room") ? `Join room ${Q.get("room")} ›` : "PvP · stake your Chog"; $("storySub").textContent = loadSave(localStorage, saveKey(CONTRACT, token)).chapter >= 2 ? "Continue · Chapter 2" : "Chapter 1 · The Genesis"; $("connectRow").style.display = "none"; $("pick").style.display = "none"; $("who").textContent = "This Chog is ready.";
+      $("playRow").style.display = ""; $("arenaSub").textContent = Q.get("room") ? `Join room ${Q.get("room")} ›` : "PvP · stake your Chog"; { const c = loadSave(localStorage, saveKey(CONTRACT, token)).chapter; $("storySub").textContent = c > 10 ? "Season 1 complete · replay any chapter" : c >= 2 ? `Continue · Chapter ${c}` : "Chapter 1 · The Genesis"; } $("connectRow").style.display = "none"; $("pick").style.display = "none"; $("who").textContent = "This Chog is ready.";
     }
   }
 }
@@ -199,8 +203,9 @@ function hud() {
   const left = Math.max(0, rules.maxHits - hits);
   $("hearts").textContent = "♥".repeat(left) + "♡".repeat(rules.maxHits - left) + (rules.revive && !reviveUsed ? " ✦" : "");
   $("wispC").textContent = `✧ ${wispsGot}/${level.wispTotal()}`;
-  const got = chap === 1 ? flow.shards.size : flow.doneCount();
-  $("shardC").textContent = "◆".repeat(got) + "◇".repeat(3 - got);
+  const pips = chap >= 3 ? (flow.pips ? flow.pips() : null) : [chap === 1 ? flow.shards.size : flow.doneCount(), 3];
+  $("shardC").style.display = pips ? "" : "none"; if (pips) $("shardC").textContent = "◆".repeat(pips[0]) + "◇".repeat(pips[1] - pips[0]);
+  $("hearts").style.display = chap >= 3 ? "none" : ""; $("wispC").style.display = level.wispTotal() ? "" : "none";
   $("obj").textContent = flow.objective() + (level.raceLeft && level.raceLeft() > 0 ? ` · ⏱ ${Math.ceil(level.raceLeft())}s` : "");
 }
 const flash = () => { $("flash").style.opacity = 0.35; setTimeout(() => $("flash").style.opacity = 0, 120); };
@@ -215,11 +220,15 @@ async function startGame(n = 1) {
   mode = "loading"; screen(""); show("loading", true); startAudio(); chap = n;
   scene.remove(floor, titleLight, titleSun, elder.root);
   if (level) { scene.remove(level.root); phys.world.free(); }   // leaving the previous chapter
-  phys = await createPhysics(); level = n === 1 ? await buildCh1(scene, phys, rules) : await buildCh2(scene, phys);
-  player = createPlayer(phys, level.spawnPoint); rig ??= createCameraRig(camera, $("view")); rig.pinned = null; rig.lockPin = false; flow = n === 1 ? createFlow() : createFlow2();
+  phys = await createPhysics(); let mod = null;
+  if (n >= 3) { mod = await import(`./chapters/story/ch${n}.js`); level = await mod.build({ scene, phys, traits: TRAITS[token] || {}, rules, token }); }
+  else level = n === 1 ? await buildCh1(scene, phys, rules) : await buildCh2(scene, phys);
+  player = createPlayer(phys, level.spawnPoint); rig ??= createCameraRig(camera, $("view")); rig.pinned = null; rig.lockPin = false; flow = n >= 3 ? { phase: "story", objective: () => storyObj, pips: () => storyPips, doneCount: () => 0 } : n === 1 ? createFlow() : createFlow2();
   hits = 0; reviveUsed = false; wispsGot = 0;
-  const C = CHAPTERS[n]; $("introImg").src = C.card; $("introTitle").textContent = C.title; $("introText").textContent = C.text;
-  rig.yaw = 0;                                     // start looking at the Doctor and the burned Elder Tree
+  const C = mod ? mod.meta : CHAPTERS[n]; $("introImg").src = C.card; $("introImg").style.filter = n === 10 ? "hue-rotate(-70deg) saturate(1.4)" : "";   // chapter 10 has no card of its own: the cave card, re-tinted red
+   $("introTitle").textContent = C.title; $("introText").textContent = C.text;
+  rig.yaw = level.camYaw ?? 0; rig.dist = level.camDist || 19; rig.pitch = level.camPitch || 0.42;   // chapter 1 starts looking at the Doctor and the burned Elder Tree
+  storyBlock = false; roaming = false; storyObj = ""; storyPips = null; fightRun = null; mashRun = null; pendingSignals.clear(); waiters.clear();
   if (Q.get("at")) { const [x, z] = Q.get("at").split(",").map(Number); player.teleport(x, 2, z); }   // debug: ?at=x,z
   if (Q.get("yaw")) rig.yaw = +Q.get("yaw");                                                         // debug: ?yaw=radians
   show("loading", false); placeChog(); rig.snap(chog.root.position);
@@ -227,7 +236,9 @@ async function startGame(n = 1) {
   mode = "intro"; screen("intro");
 }
 async function goChapter(n) { show("dlg", false); dialogue = null; ["hud", "obj"].forEach(i => show(i, false)); await startGame(n); }
-function begin() { screen(""); mode = "play"; ["hud", "obj", "help"].forEach(i => show(i, true)); hud(); setTimeout(() => show("help", false), 9000); }
+function begin() { screen("");
+  if (chap >= 3) { mode = "story"; runStory(); return; }
+  mode = "play"; ["hud", "obj", "help"].forEach(i => show(i, true)); hud(); setTimeout(() => show("help", false), 9000); }
 function placeChog() {
   chog.root.position.set(player.pos.x, player.pos.y - (CAP_HH + CAP_R) - FOOT_Y, player.pos.z);
   chog.root.rotation.y = player.heading;
@@ -258,12 +269,13 @@ function win2() {
   if (!s.done.includes(2)) s.done.push(2); s.chapter = Math.max(s.chapter, 3);
   for (const b of ["allies", wispsGot === level.wispTotal() ? "all-wisps-2" : null]) if (b && !s.badges.includes(b)) s.badges.push(b);
   writeSave(localStorage, key, s);
-  $("resTitle").textContent = "Chapter 2 complete"; $("resText").textContent = `The heroes are together. Next: Whispers in Moyaki's Pub — coming soon. Wisps: ${wispsGot}/${level.wispTotal()}.`;
-  $("resMain").textContent = "Play again"; screen("result"); chronicleChapter(2);
+  $("resTitle").textContent = "Chapter 2 complete"; $("resText").textContent = `The heroes are together, and Moyaki has invited everyone to his pub. Wisps: ${wispsGot}/${level.wispTotal()}.`;
+  nextChap = 3; $("resMain").textContent = "Continue to Chapter 3 ▸"; screen("result"); chronicleChapter(2);
 }
 $("resMain").onclick = () => {
   if ($("resMain").textContent.startsWith("Play again")) return location.reload();
-  if ($("resMain").textContent.startsWith("Continue")) return goChapter(2);
+  if ($("resMain").textContent.startsWith("Continue")) return goChapter(nextChap);
+  if ($("resMain").textContent.startsWith("Back to the menu")) return location.reload();
   hits = 0; reviveUsed = false; screen(""); mode = "play"; ["hud", "obj"].forEach(i => show(i, true));
   if (level.chasing()) level.restartChase(player); else respawn(); hud();
 };
@@ -274,7 +286,7 @@ function readInput(forceRun = false) {
   const input = {
     mx: (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0) - (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0),
     mz: (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0),
-    run: keys.has("ShiftLeft") || keys.has("ShiftRight") || forceRun, jumpPressed: pressed.has("Space"), spinPressed: pressed.has("KeyK") || clickSpin,
+    run: keys.has("ShiftLeft") || keys.has("ShiftRight") || forceRun, jumpPressed: pressed.has("Space"), spinPressed: pressed.has("KeyK") || clickSpin, skillPressed: pressed.has("KeyL"),
   };
   if (stick.id !== null) { input.mx += stick.mx; input.mz += stick.mz; if (Math.hypot(stick.mx, stick.mz) > 0.85) input.run = true; }
   return input;
@@ -298,19 +310,34 @@ function frame() {
   if (!chog) return;
   if (mode === "title" || mode === "credits") {
     const sx = innerWidth > 700 ? 2.6 : 0; chog.root.position.x = sx; chog.root.position.z = 0; floor.position.x = sx;
-    elder.root.position.x = sx + 21; if (elder.embers) { elder.embers.update(t); elder.glow.update(t); } elder.root.rotation.y = Math.sin(t * 0.15) * 0.15;
+    elder.root.position.x = sx + 2; elder.root.position.z = -58; if (elder.embers) { elder.embers.update(t); elder.glow.update(t); } elder.root.rotation.y = Math.sin(t * 0.15) * 0.15;
     if (TF.freeze) {} else if (TF.phase === "idle" || TF.phase === "done") { chog.root.position.y = -FOOT_Y; chog.root.rotation.y = Math.sin(t * 0.4) * 0.6; } else tickTransform(dt, sx);
     chog.update(dt, 0); updateBursts(dt);
     camera.position.set(0, 2.8, 14); camera.lookAt(0, 2.3, 0); gfx.render(chog.parts); return;
   }
-  if (mode === "arena") { arenaMode.frame(dt, readInput(), keys); clickSpin = false; pressed.clear(); if (TOUCH) { show("touch", !$("arenaLobby").classList.contains("on")); $("tbTalk").style.display = "none"; } return; }
+  if (mode === "arena") { arenaMode.frame(dt, readInput(), keys); clickSpin = false; pressed.clear(); if (TOUCH) { show("touch", !$("arenaLobby").classList.contains("on")); $("tbTalk").style.display = "none"; $("tbSkill").style.display = "none"; } return; }
   if (!level) { gfx.render(chog.parts); return; }
   if (mode === "cine") {
     cine.update(dt); level.update(dt, player, player.feet(), false); chog.update(dt, cineGait.speed, cineGait.air); updateBursts(dt);
     gfx.render(chog.parts.concat(level.parts)); if (cine.done) endCine(); return;
   }
+  if (mode === "story") {   // chapters 3-10 between playable parts: staging, dialogue, choices
+    if (dialogue && (pressed.has("KeyF") || pressed.has("Space"))) advance();
+    level.active = false; level.update(dt, player, player.feet(), false); chog.update(dt, 0, false); updateBursts(dt); tickMash(dt);
+    if (rig.pinned) rig.update(dt, chog.root.position, keys);
+    if (shake > 0) { shake = Math.max(0, shake - dt); camera.position.x += (Math.random() - 0.5) * shake * 2; camera.position.y += (Math.random() - 0.5) * shake * 2; }
+    if (TOUCH) show("touch", false);
+    gfx.render(chog.parts.concat(level.parts)); clickSpin = false; pressed.clear(); return;
+  }
+  if (mode === "fight") {
+    level.active = false; level.update(dt, player, player.feet(), false);
+    if (fightRun) { const r = fightRun.f.frame(dt, readInput(), keys); if (r.done) { fightRun.f.dispose(); const res = fightRun.res; fightRun = null; res(r); } }
+    if (TOUCH) { show("touch", true); $("tbTalk").style.display = "none"; $("tbSkill").style.display = "block"; $("tbSkill").textContent = ({ dash: "Dash", beam: "Beam", shield: "Guard" })[fightRun?.f.sim.players.me.perks.ability] || "Skill"; }
+    updateBursts(dt); gfx.render(chog.parts.concat(level.parts)); clickSpin = false; pressed.clear(); return;
+  }
   if (mode === "play" && level.raceLeft && level.raceLeft() > 0) hud();
-  const playing = mode === "play" && !dialogue;
+  const playing = mode === "play" && !dialogue && !storyBlock;
+  level.active = roaming && chap >= 3;
   if (pressed.has("KeyF") || (dialogue && pressed.has("Space"))) { if (dialogue) advance(); else if (talkTarget()) talk(); }
   const input = playing ? readInput(level.chasing()) : { mx: 0, mz: 0 };
   if (Q.has("auto") && playing) input.mz = 1;
@@ -331,7 +358,7 @@ function frame() {
   chog.root.visible = !(player.invuln > 0 && Math.floor(t * 14) % 2 === 0);
   if (player.feet() < -20) respawn();
   show("prompt", playing && !!talkTarget());
-  if (TOUCH) { show("touch", playing); $("tbTalk").style.display = playing && talkTarget() ? "block" : "none"; }
+  if (TOUCH) { show("touch", playing); $("tbTalk").style.display = playing && talkTarget() ? "block" : "none"; $("tbSkill").style.display = "none"; }
   // camera: free orbit normally; during the chase it rides in front, looking back at you and the beast
   if (level.chasing() && !rig.lockPin) rig.pinned = { pos: new THREE.Vector3(player.pos.x * 0.5, player.pos.y + 7, player.pos.z - 17), look: new THREE.Vector3(player.pos.x * 0.6, player.pos.y + 2, player.pos.z + 6) };
   rig.update(dt, chog.root.position.clone().setY(player.pos.y - 1), keys);
@@ -350,6 +377,9 @@ function handle(lev) {
     if (e.splash) { sfx("splash"); damage({ x: player.pos.x, z: player.pos.z }); if (mode === "play") respawn(); }
     if (e.caught) { sfx("roar"); shake = 0.6; hits = rules.maxHits; fail("The beast caught you. Keep running — jump the logs, dodge the stones!"); }
     if (e.portal) { flow.portal(); win(); }
+    if (e.signal) signalKey(e.signal);
+    if (e.respawn) { respawn(); flash(); toast(typeof e.respawn === "string" ? e.respawn : "Back to the last safe spot"); sfx("hurt"); }
+    if (e.fx) { sfx(e.fx.sfx || "wisp"); if (e.fx.at) burst(scene, e.fx.at, { color: e.fx.color || 0xffe27a, count: e.fx.count || 30, speed: e.fx.speed || 9 }); }
     if (e.item) { flow.item(e.item); sfx(e.item === "ring" ? "wisp" : "shard"); burst(scene, e.at, { color: e.item === "spice" ? 0xff6a3a : 0x9ffcff, count: 36, speed: 10 }); hud(); }
     if (e.ringsReset) { flow.reset("ring"); if (flow.got.ring === 0) say("race_reset"); hud(); }
     if (e.fire && flow.phase === "gather") { flow.fire(); ["hud", "obj"].forEach(i => show(i, false)); return playCine(campfireShots(), win); }
@@ -365,6 +395,7 @@ function sim(input, seconds) {
   }
 }
 function talkTarget() {
+  if (chap >= 3) return level.talkTarget ? level.talkTarget(player.pos) : null;
   if (chap === 1) return nearDoctor() ? "doctor" : null;
   let best = null, bd = 6.5;
   for (const [id, o] of level.npcs()) { const d = Math.hypot(player.pos.x - o.position.x, player.pos.z - o.position.z); if (d < bd) { bd = d; best = id; } }
@@ -372,6 +403,7 @@ function talkTarget() {
 }
 function nearDoctor() { return Math.hypot(player.pos.x - level.doctor.position.x, player.pos.z - level.doctor.position.z) < 7 && ["intro", "explore", "return"].includes(flow.phase); }
 function talk() {
+  if (chap >= 3) { const id = talkTarget(); if (id && level.talk) level.talk(id, storyApi); return; }
   if (chap === 2) {
     const id = talkTarget(); if (!id) return;
     if (id === "molandak") return say(flow.phase === "gather" ? "molandak_gather" : "molandak");
@@ -427,6 +459,78 @@ function campfireShots() {
   ];
 }
 
+// ---------- story chapters 3-10: one async script per chapter drives cutscenes, dialogue, choices, fights and short free-roam parts ----------
+const AUTO = Q.has("selftest") || Q.has("autoplay");   // tests: dialogue and cutscenes resolve instantly, fights are won
+const pendingSignals = new Set(), waiters = new Map();
+function signalKey(k) { const w = waiters.get(k); if (w) { waiters.delete(k); w(); } else pendingSignals.add(k); }
+const sleep = ms => AUTO ? Promise.resolve() : new Promise(r => setTimeout(r, ms));
+function toast(text, ms = 2800) { const el = $("toast"); el.textContent = text; el.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("on"), ms); }
+function tickMash(dt) {
+  const m = mashRun; if (!m) return;
+  const taps = (pressed.has("Space") ? 1 : 0) + (pressed.has("KeyK") ? 1 : 0) + (pressed.has("KeyF") ? 1 : 0) + (clickSpin ? 1 : 0) + tapQueue; tapQueue = 0;
+  m.got = Math.min(m.need, m.got + taps); m.left -= dt; $("mashBar").firstElementChild.style.width = `${m.got / m.need * 100}%`; $("mashTime").textContent = `${Math.max(0, m.left).toFixed(1)}s`;
+  if (taps) sfx("step", 0.5);
+  if (m.got >= m.need || m.left <= 0) { mashRun = null; $("mash").classList.remove("on"); m.res(m.got >= m.need); }
+}
+$("mashBtn").addEventListener("pointerdown", e => { e.preventDefault(); tapQueue++; });
+function winStory(n, o = {}) {
+  mode = "result"; ["hud", "obj", "touch", "prompt"].forEach(i => show(i, false)); $("arHud").classList.remove("on");
+  const key = saveKey(CONTRACT, token), sv = loadSave(localStorage, key);
+  if (!sv.done.includes(n)) sv.done.push(n); sv.chapter = Math.max(sv.chapter, n + 1);
+  for (const b of o.badges || []) if (!sv.badges.includes(b)) sv.badges.push(b);
+  writeSave(localStorage, key, sv);
+  $("resTitle").textContent = `Chapter ${n} complete`; $("resText").textContent = o.text || "";
+  nextChap = n + 1; $("resMain").textContent = n < 10 ? `Continue to Chapter ${n + 1} ▸` : "Back to the menu";
+  screen("result"); chronicleChapter(n);
+}
+const storyApi = {
+  auto: AUTO, THREE, toast, sleep, sfx, burst, scene, camera, signal: signalKey,
+  get chog() { return chog; }, get rig() { return rig; },
+  get token() { return token; }, get player() { return player; }, get level() { return level; }, get chap() { return chap; },
+  traits: () => TRAITS[token] || {}, rules: () => rules, perks: () => arenaPerks(TRAITS[token] || {}),
+  flag: k => loadSave(localStorage, saveKey(CONTRACT, token)).flags[k],
+  setFlag(k, v) { const key = saveKey(CONTRACT, token), sv = loadSave(localStorage, key); sv.flags[k] = v; writeSave(localStorage, key, sv); },
+  bumpFlag(k, d = 1) { this.setFlag(k, (this.flag(k) || 0) + d); },
+  say: lines => AUTO ? Promise.resolve() : new Promise(res => { dialogue = { lines, i: 0, done: res }; show("dlg", true); renderLine(); sfx("talk"); }),
+  choose(prompt, options) {
+    if (AUTO) return Promise.resolve(storyApi.autoPick ? storyApi.autoPick(options) : 0);
+    return new Promise(res => {
+      $("choiceQ").textContent = prompt; storyBlock = true; $("choiceBtns").innerHTML = options.map((o, i) => `<button data-i="${i}">${o}</button>`).join(""); $("choice").classList.add("on");
+      $("choiceBtns").querySelectorAll("button").forEach(b => b.onclick = () => { $("choice").classList.remove("on"); storyBlock = false; sfx("talk"); res(+b.dataset.i); });
+    });
+  },
+  cine: shots => new Promise(res => { playCine(shots, () => { mode = roaming ? "play" : "story"; res(); }); if (AUTO) { cine.skip(); endCine(); } }),
+  async title(big, small = "", ms = 2600) { if (AUTO) return; $("tcSmall").textContent = small; $("tcBig").textContent = big; $("titleCard").classList.add("on"); await sleep(ms); $("titleCard").classList.remove("on"); await sleep(350); },
+  roam(o = {}) { if (AUTO) setTimeout(() => level.autoSolve && level.autoSolve(storyApi), 80); roaming = true; mode = "play"; rig.pinned = null; if (o.at) storyApi.place(o.at[0], o.at[1], o.face); if (o.obj !== undefined) storyObj = o.obj; if (o.pips !== undefined) storyPips = o.pips; ["hud", "obj"].forEach(i => show(i, true)); hud(); },
+  stopRoam() { roaming = false; mode = "story"; ["hud", "obj", "prompt"].forEach(i => show(i, false)); if (TOUCH) show("touch", false); },
+  objective(text) { storyObj = text; hud(); }, pips(a, b) { storyPips = b ? [a, b] : null; hud(); },
+  place(x, z, face) { player.teleport(x, 2, z); if (face) { const a = Math.atan2(face[0] - x, face[1] - z); rig.yaw = a - Math.PI; player.heading = a; } player.update(0.016, { mx: 0, mz: 0 }, 0); placeChog(); chog.root.visible = true; rig.snap(chog.root.position); },
+  pinCam(c, snap = false) { rig.pinned = { pos: new THREE.Vector3(c[0], c[1], c[2]), look: new THREE.Vector3(c[3], c[4], c[5]) }; if (snap) rig.snap(chog.root.position); },
+  unpinCam() { rig.pinned = null; },
+  waitFor(key) { if (pendingSignals.delete(key)) return Promise.resolve(); return new Promise(res => waiters.set(key, res)); },
+  mash(o) { if (AUTO) return Promise.resolve(true); return new Promise(res => { mashRun = { need: o.need, got: 0, left: o.secs, res }; $("mashText").textContent = o.text; $("mashBar").firstElementChild.style.width = "0%"; $("mash").classList.add("on"); }); },
+  shake(a = 0.4) { shake = Math.max(shake, a); },
+  async fight(cfg) {
+    let losses = 0;
+    for (;;) {
+      mode = "fight"; storyBlock = false; ["hud", "obj", "prompt"].forEach(i => show(i, false)); rig.pinned = null;
+      const r = await new Promise(res => { fightRun = { res, f: createFight({ ...cfg, rig, chog, sfx, assist: losses, autoWin: AUTO, player: { perks: { ...arenaPerks(TRAITS[token] || {}), ability: abilityKind(TRAITS[token] || {}), revive: !!rules.revive } } }) }; });
+      mode = "story"; chog.root.visible = true; if (TOUCH) show("touch", false);
+      if (r.won) return r;
+      losses++;
+      if (losses >= 2) { if (await storyApi.choose("You've been beaten twice.", ["Try again", "Skip this fight"]) === 1) return { won: false, skipped: true }; }
+      else { toast("Try again — they're not unbeatable"); await sleep(1400); }
+    }
+  },
+  finish: o => winStory(chap, o),
+};
+let storyRun = 0;
+async function runStory() {
+  const my = ++storyRun;
+  try { await level.script(storyApi); }
+  catch (e) { if (my === storyRun) { console.error("story script", e); document.body.insertAdjacentHTML("beforeend", `<div class="pill" style="position:fixed;bottom:12px;left:12px;z-index:60">Story error: ${e.message}</div>`); } }
+}
+
 // ---------- boot ----------
 $("ttl").textContent = TITLE; document.title = TITLE;
 $("credText").innerHTML = CREDITS.map(l => `<p>${l}</p>`).join("") + "<p>3D props, characters and sound effects: Kenney (kenney.nl), CC0.</p>";
@@ -435,41 +539,21 @@ $("boardBtn").onclick = async () => { mode = "credits"; screen("board"); $("boar
 $("boardBack").onclick = () => { mode = "title"; screen("title"); };
 $("credBtn").onclick = () => { mode = "credits"; screen("credits"); };
 $("credBack").onclick = () => { mode = "title"; screen("title"); };
-$("tok").value = GUEST_TOKEN;
 const guestGo = id => { holder = null; $("connectRow").style.display = "none"; $("who").textContent = "Summoning a Chog…"; transformTo(id); };
-$("rnd").onclick = () => guestGo(Math.min(1969, Math.max(1, +$("tok").value || GUEST_TOKEN)));
-$("guest").onclick = () => guestGo(1 + Math.floor(Math.random() * 1969));
-$("again").onclick = () => {
-  plainChog(); TF.phase = "idle"; $("playRow").style.display = "none"; $("connectRow").style.display = ""; ["traits", "perks", "prog"].forEach(i => $(i).textContent = "");
-  $("nameCard").style.transform = "translateX(-50%) translateY(-120px)"; $("who").innerHTML = "A plain Chog. Connect your wallet to become <b>yours</b>.";
-};
-$("connect").onclick = async () => {
-  const say = s => $("who").textContent = s, stop = () => { TF.phase = "idle"; swirl.material.opacity = 0; };
-  try {
-    if (!hasWallet()) return say("No wallet found. Install MetaMask or Rabby, or play as guest.");
-    say("Connecting…"); const addr = await walletConnect(); holder = addr;
-    say(`Scanning Monad for ${addr.slice(0, 6)}…${addr.slice(-4)}’s Chogs…`); startCharge();
-    const ids = await ownedChogs(addr);
-    if (!ids.length) { stop(); return say("No Chog Genesis in this wallet. Play as guest, or connect another wallet."); }
-    $("connectRow").style.display = "none";
-    if (ids.length === 1) { say(`Found Chog #${ids[0]}!`); return transformTo(ids[0]); }
-    stop(); say(`You hold ${ids.length} Chogs. Pick one:`); $("pick").style.display = "";
-    $("pickList").innerHTML = ids.map(id => `<button data-id="${id}">#${id}</button>`).join("");
-    $("pickList").querySelectorAll("button").forEach(b => b.onclick = () => { $("pick").style.display = "none"; transformTo(+b.dataset.id); });
-  } catch (e) { stop(); say(e.message || String(e)); }
-};
+$("spinBtn").onclick = () => guestGo(1 + Math.floor(Math.random() * 1969));
+$("again").onclick = () => guestGo(1 + Math.floor(Math.random() * 1969));
 // ---------- home menu: story chapter map, Chronicle ----------
 const STORY = ["The Genesis", "Back to the Past", "Whispers in Moyaki's Pub", "Echo of a Shattered Future", "The Heroes Assemble", "The First Encounter", "The Trap", "The Ambush", "Guardians in the Cave", "End Game"];
 function renderChapters() {
   const reached = loadSave(localStorage, saveKey(CONTRACT, token)).chapter || 1;
-  $("chapters").innerHTML = STORY.map((name, i) => { const n = i + 1, built = n <= 2, open = built && n <= reached;
-    const state = !built ? "Coming soon" : open ? "▶ Play" : "🔒 Finish chapter " + (n - 1);
-    return `<button class="chap${open ? "" : " locked"}" data-ch="${n}">${n <= 9 ? `<img src="cards/ch${n}.jpg" alt="">` : `<span class="ph"></span>`}<div><b>${n}. ${name}</b><br>${state}</div></button>`; }).join("");
+  $("chapters").innerHTML = STORY.map((name, i) => { const n = i + 1, built = n <= 10, open = built && n <= reached;
+    const state = !built ? "Coming soon" : open ? "▶ Play" : "Locked · finish chapter " + (n - 1);
+    return `<button class="chap${open ? "" : " locked"}" data-ch="${n}"><img src="cards/ch${Math.min(n, 9)}.jpg" alt=""${n === 10 ? ' style="filter:hue-rotate(-70deg) saturate(1.4)"' : ""}><div><b>${n}. ${name}</b><br>${state}</div></button>`; }).join("");
   $("chapters").querySelectorAll(".chap:not(.locked)").forEach(b => b.onclick = () => startGame(+b.dataset.ch));
 }
 $("menuStory").onclick = () => { mode = "credits"; screen("story"); renderChapters(); };
 $("storyBack").onclick = () => { mode = "title"; screen("title"); };
-$("menuChron").onclick = () => { mode = "credits"; screen("chronScreen"); $("chronTitle").textContent = `📜 Chog #${token}'s Chronicle`; showInfo(); };
+$("menuChron").onclick = () => { mode = "credits"; screen("chronScreen"); $("chronTitle").textContent = `Chog #${token}'s Chronicle`; showInfo(); };
 $("chronBack").onclick = () => { mode = "title"; screen("title"); };
 if (matchMedia("(pointer: coarse)").matches) addEventListener("click", () => document.documentElement.requestFullscreen?.().then(() => screen.orientation?.lock?.("landscape")).catch(() => {}), { once: true });   // touch: fullscreen + landscape lock on first tap
 $("start").onclick = () => { begin(); };
@@ -478,10 +562,10 @@ Promise.all([fetch("../body/traits.json").then(r => r.json()), loadChog("..")]).
   TRAITS = tr; chog = c; scene.add(chog.root); frame();
   getJSON("/world").then(w => growElder(Q.has("tree") ? +Q.get("tree") : w.percent)).catch(() => {});   // ?tree=N previews the tree at N%
   if (Q.has("play") || Q.has("selftest")) { bg = chog.applyTraits(TRAITS[token] || {}); rules = rulesFor(TRAITS[token] || {}); }   // debug links skip the title
-  else { plainChog(); if (Q.get("token")) guestGo(+Q.get("token"));
+  else { plainChog(); guestGo(1 + Math.floor(Math.random() * 1969));
     if (Q.get("holder") && ["localhost", "127.0.0.1"].includes(location.hostname)) holder = Q.get("holder").toLowerCase();   // debug (local only): act as this wallet (anvil test Chogs)
     if (Q.get("tft")) { const sx = innerWidth > 700 ? 2.6 : 0; let total = 0; while (total < +Q.get("tft")) { tickTransform(1 / 60, sx); total += 1 / 60; if (TF.phase === "done") break; } TF.freeze = true; } }   // debug: jump the transform to t seconds                               // ?token=N: auto-transform
   const CH = +(Q.get("ch") || 1);
-  if (Q.has("selftest")) { await startGame(CH); begin(); (await import(CH === 2 ? "./selftest2.js" : "./selftest.js")).run(window.DBG); return; }
+  if (Q.has("selftest")) { await startGame(CH); begin(); (await import(CH >= 3 ? "./selftest_story.js" : CH === 2 ? "./selftest2.js" : "./selftest.js")).run(window.DBG); return; }
   if (Q.has("play")) { await startGame(CH); if (Q.has("go")) { if (mode === "cine") { cine.skip(); endCine(); } begin(); } if (Q.has("chase")) { flow.phase = "chase"; level.startChase(); if (Q.get("cz")) { player.teleport(0, 2, +Q.get("cz")); rig.pinned = Q.has("ahead") ? { pos: new THREE.Vector3(0, 7, +Q.get("cz") + 12), look: new THREE.Vector3(0, 2, +Q.get("cz") - 20) } : { pos: new THREE.Vector3(0, 9, +Q.get("cz") - 17), look: new THREE.Vector3(0, 2, +Q.get("cz") + 6) }; rig.lockPin = Q.has("ahead"); camera.position.copy(rig.pinned.pos); rig.look.copy(rig.pinned.look); } } }   // debug: ?chase&cz=z
 }).catch(e => { document.body.insertAdjacentHTML("beforeend", `<div class="pill" style="position:fixed;bottom:12px;left:12px">Load failed: ${e.message}</div>`); console.error(e); });
