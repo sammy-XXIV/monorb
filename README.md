@@ -1,8 +1,16 @@
+![Monorb: the cast](docs/media/banner.jpg)
+
 # Monorb: relive the Monadverse story as your own Chog
 
 A 3D browser game built for **Chogathon 2026**. You play the Monadverse story (Molandak vs Mongrod) as a **Chog Genesis** Chog. Its traits build your 3D character and change how you play. You can fight other Chogs live in **Bonk Arena**, and every Chog keeps a **Chronicle**: a history tied to the Chog itself, which stays with it when it changes hands.
 
 **Play:** https://monorb.pages.dev/game/ (desktop, or a phone held landscape; no install, no login)
+
+| Spin a Chog | Story mode |
+|---|---|
+| ![Spin a Chog](docs/media/spin.jpg) | ![Story mode](docs/media/story.jpg) |
+| **Bonk Arena** | **Chronicle** |
+| ![Bonk Arena](docs/media/arena.jpg) | ![Chronicle](docs/media/chronicle.jpg) |
 
 ## For judges: how to test (about 5 minutes)
 
